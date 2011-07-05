@@ -25,14 +25,11 @@ project "precache"
 	{
 		"src/**.c",	
 		"include/**.h",	
-		"../xwl2/src/**.c",
-		"../xwl2/src/**.c",	
 	}
 
 	includedirs 
 	{ 
 		"include",
-		"../xwl2/include",	
 	}	
 	
 	if targetOS == "macosx" then

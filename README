@@ -32,6 +32,19 @@ BUILDING
 
 The code should successfully build under Linux, Windows, and Mac OSX 10.6.x+
 It uses the Premake build system (http://industriousone.com/premake) which allows me enough control while balancing maintenance of the premake script.
+Simply run premake4 from the command line to generate your favorite project files.
+
+I have tested the following project files under the respective OS.
+	Linux
+	premake4 codeblocks
+
+	Mac OSX
+	premake4 xcode3
+
+	Windows
+	premake4 vs2008
+
+
 
 
 
