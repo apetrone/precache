@@ -22,3 +22,16 @@ freely, subject to the following restrictions:
 
 
 Portions of SFML were used for the window code.
+
+KNOWN ISSUES
+
+Key Events on Linux and under Mac OSX don't work 100%. This was never transferred over and wasn't needed for this project.
+
+
+BUILDING
+
+The code should successfully build under Linux, Windows, and Mac OSX 10.6.x+
+It uses the Premake build system (http://industriousone.com/premake) which allows me enough control while balancing maintenance of the premake script.
+
+
+
