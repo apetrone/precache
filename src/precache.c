@@ -947,7 +947,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     xwl_startup();
 
 
-    window = xwl_create_window( &p );
+    window = xwl_create_window( &p, "Precache Test" );
 
     if ( !window )
     {
