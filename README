@@ -25,8 +25,7 @@ Portions of SFML were used for the window code.
 
 KNOWN ISSUES
 
-Key Events on Linux and under Mac OSX don't work 100%. This was never transferred over and wasn't needed for this project.
-
+XWLE_TEXT events on Linux only generate ASCII equivalent Unicode values.
 
 BUILDING
 
