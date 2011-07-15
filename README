@@ -35,6 +35,7 @@ Simply run premake4 from the command line to generate your favorite project file
 
 I have tested the following project files under the respective OS.
 	Linux
+	* Dependencies: mesa-common-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev
 	premake4 codeblocks
 
 	Mac OSX

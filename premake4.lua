@@ -5,7 +5,7 @@ targetOS = "unknown";
 
 if _ACTION == "vs2005" or _ACTION == "vs2008" or _ACTION == "vs2010" then
 	targetOS = "windows"
-elseif _ACTION == "codeblocks" then
+elseif _ACTION == "codeblocks" or _ACTION == "gmake" then
 	targetOS = "linux"
 elseif _ACTION == "xcode3" then
 	targetOS = "macosx"
@@ -53,7 +53,7 @@ project "precache"
 			"opengl32"
 		}
 	elseif targetOS == "linux" then
-		defines { "LINUX", baseDefines }
+		defines { "LINUX=1", baseDefines }
 		links
 		{
 			"Xinerama",
