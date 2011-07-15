@@ -481,6 +481,7 @@ void xwl_pollevent_osx( xwl_event_t * e )
 										   dequeue: YES];
 	if ( event != nil )
 	{
+		//NSLog( @"Debug Event!" );
 		// dispatch the event!
 		[NSApp sendEvent: event ];
 	}
@@ -906,7 +907,7 @@ void xwl_osx_finish( xwl_window_t * window )
 
 
 
-xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params )
+xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params, const char * title )
 {
 	NSRect frame;
 	NSPoint origin;
@@ -944,7 +945,8 @@ xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params )
 	[handle makeMainWindow];
 	[handle makeKeyWindow];
 	[handle orderFront: nil];
-	[handle setTitle: @"My Test Window"];
+	
+	[handle setTitle: [NSString stringWithUTF8String: title] ];
 	[handle setAcceptsMouseMovedEvents: YES];
 	[handle setReleasedWhenClosed: NO];
 

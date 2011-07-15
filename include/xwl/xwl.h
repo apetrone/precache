@@ -227,6 +227,7 @@ typedef struct xwl_windowparams_s
 	u32 x;
 	u32 y;
 	void * userdata;
+	char * title;
 } xwl_windowparams_t;
 
 typedef struct xwl_event_s
@@ -278,7 +279,8 @@ void xwl_shutdown();
 i32 xwl_pollevent( xwl_event_t *event );
 
 // returns 0 on failure
-xwl_window_t *xwl_create_window( xwl_windowparams_t *params );
+// tite is a UTF-8 encoded string
+xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title );
 
 
 // set the event callback

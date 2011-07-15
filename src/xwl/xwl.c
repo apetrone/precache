@@ -648,6 +648,7 @@ i32 xwl_startup()
 
 #if LINUX
     {
+        Bool detectable;
         currentDisplay = XOpenDisplay( 0 );
 
         if ( currentDisplay )
@@ -659,7 +660,14 @@ i32 xwl_startup()
         {
             return 0;
         }
+
+        // disable auto-repeats
+        // "The standard behavior of the X server is to generate a KeyRelease event for every KeyPress event."
+        // #include <X11/XKBlib.h>
+        //XkbSetDetectableAutorepeat( currentDisplay, True, &detectable );
     }
+
+
 #endif
 
 #if __APPLE__
@@ -838,7 +846,6 @@ void ProcessEvent( XEvent event, xwl_window_handle_t * window )
     KeySym sym;
     Status returnedStatus;
 
-
     ev.target = &window->handle;
     switch( event.type )
     {
@@ -880,8 +887,21 @@ void ProcessEvent( XEvent event, xwl_window_handle_t * window )
 
                     if ( length > 0 )
                     {
-                        printf( "Do UTF-8 -> UTF-32 Conversion!\n" );
-                        //end = Unicode::
+                        if ( length == 1 ) // straight to ASCII
+                        {
+                            ev.unicode = (int)keybuffer[0];
+                        }
+                        else
+                        {
+                            printf( "Do UTF-8 -> UTF-32 Conversion!\n" );
+                            printf( "Length is: %i bytes.\n", length );
+                            printf( "%c\n", keybuffer[0] );
+                            //end = Unicode::
+                        }
+
+                        // send a text event
+                        ev.type = XWLE_TEXT;
+                        xwl_send_event( &ev );
                     }
                 }
 
@@ -972,6 +992,7 @@ i32 xwl_pollevent( xwl_event_t *event )
     XEvent ev;
     i32 i;
     xwl_window_handle_t *wh = 0;
+    XEvent lastKeyReleaseEvent;
 
     for( i = 0; i < XWL_MAX_WINDOW_HANDLES; ++i )
     {
@@ -984,7 +1005,29 @@ i32 xwl_pollevent( xwl_event_t *event )
                 {
                     if ( ev.xkey.keycode < 256 )
                     {
+                        // To detect if it is a repeated key event, we check the current state of the key.
+                        // - If the state is "down", KeyReleased events must obviously be discarded.
+                        // - KeyPress events are a little bit harder to handle: they depend on the EnableKeyRepeat state,
+                        //   and we need to properly forward the first one.
+                        char keys[32];
+                        XQueryKeymap(currentDisplay, keys);
+                        if (keys[ev.xkey.keycode >> 3] & (1 << (ev.xkey.keycode % 8)))
+                        {
+                            // KeyRelease event + key down = repeated event --> discard
+                            if (ev.type == KeyRelease)
+                            {
+                                lastKeyReleaseEvent = ev;
+                                continue;
+                            }
 
+                            // KeyPress event + key repeat disabled + matching KeyRelease event = repeated event --> discard
+                            if ((ev.type == KeyPress) &&
+                                (lastKeyReleaseEvent.xkey.keycode == ev.xkey.keycode) &&
+                                (lastKeyReleaseEvent.xkey.time == ev.xkey.time))
+                            {
+                                continue;
+                            }
+                        }
                     }
                 }
 
@@ -1002,7 +1045,7 @@ i32 xwl_pollevent( xwl_event_t *event )
 }
 
 
-xwl_window_t *xwl_create_window( xwl_windowparams_t *params )
+xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title )
 {
 	xwl_window_handle_t * wh = 0;
     xwl_renderer_settings_t cfg;
@@ -1010,11 +1053,14 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params )
 #ifdef _WIN32
 	i32 style = WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
 	RECT clientrect;
-
+	wchar_t windowName[ 128 ];
+	//memset( windowName, 0, 128 );
 	HWND handle;
 
 	style |= WS_MINIMIZEBOX | WS_CAPTION | WS_BORDER | WS_SYSMENU;
 
+	if ( title == 0 )
+		title = "Untitled Window";
 
 	if ( !(params->flags & XWL_FULLSCREEN) )
 	{
@@ -1027,7 +1073,9 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params )
 	if ( !(params->flags & XWL_NORESIZE) )
 		style |= WS_OVERLAPPEDWINDOW;
 
-	handle = CreateWindowW( xwl_windowClassName, L"xwl2", style, params->x, params->y, params->width, params->height, 0, 0, GetModuleHandle(0), 0 );
+	MultiByteToWideChar( CP_UTF8, 0, title, -1, windowName, 128 );
+
+	handle = CreateWindowW( xwl_windowClassName, windowName, style, params->x, params->y, params->width, params->height, 0, 0, GetModuleHandle(0), 0 );
 
 	if ( !handle )
 	{
@@ -1083,6 +1131,8 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params )
 	Colormap colormap;
 	int cwattrs;
 
+	if ( title == 0 )
+		title = "Untitled Window";
 
     wh = xwl_get_unused_window();
 
@@ -1125,7 +1175,14 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params )
     glXMakeCurrent( currentDisplay, handle, cfg.window->context );
 
     //set window name
-    XStoreName( currentDisplay, handle, "title" );
+    // XStoreName is NOT Unicode aware! So basically, don't use anything except "Host Portable Character Encoding", (essentially, ASCII), or the result will be implementation-dependent.
+    XStoreName( currentDisplay, handle, title );
+
+    // to work around XStoreName's shortcomings, we use XChangeProperty with _NEW_WM_NAME
+    XChangeProperty( currentDisplay, handle,
+                    XInternAtom(currentDisplay, "_NET_WM_NAME", False),
+                    XInternAtom(currentDisplay, "UTF8_STRING", False),
+                    8, PropModeReplace, (unsigned char*)title, strlen(title) );
 
     // show the window
     XMapWindow( currentDisplay, handle );
@@ -1153,7 +1210,10 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params )
 #endif
 
 #if __APPLE__
-	wh = xwl_create_osx_window( params );
+	if ( title == 0 )
+		title = "Untitled Window";
+
+	wh = xwl_create_osx_window( params, title );
 	cfg.window = &wh->handle;
 
     if ( (params->flags & XWL_OPENGL) )

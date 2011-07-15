@@ -5,7 +5,7 @@
 void xwl_osx_startup();
 void xwl_osx_shutdown();
 
-xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params );
+xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params, const char * title );
 void xwl_pollevent_osx( xwl_event_t * event );
 void xwl_setup_osx_rendering( xwl_window_t * window );
 void xwl_osx_finish( xwl_window_t * window );
