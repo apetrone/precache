@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // platform includes
 #if LINUX
 #include <X11/Xlib.h>
@@ -19,6 +23,8 @@
 #elif __APPLE__
 #endif
 
+
+
 #ifndef Z_TYPES
 typedef signed char i8;
 typedef unsigned char u8;
@@ -27,6 +33,7 @@ typedef unsigned short u16;
 typedef short i16;
 typedef int i32;
 #endif
+
 
 
 // keys
@@ -324,3 +331,8 @@ typedef struct xwl_renderer_settings_s
 #endif
 
 } xwl_renderer_settings_t;
+
+
+#ifdef __cplusplus
+}; // extern "C"
+#endif

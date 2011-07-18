@@ -4,12 +4,12 @@
 #include <string.h> // for memset
 #include <wchar.h>
 
+
 #if _WIN32
 
 static wchar_t xwl_windowClassName[] = L"xwl_window";
 
 #endif
-
 
 
 #if LINUX
@@ -19,12 +19,13 @@ static XIM currentInputMethod = 0;
 static XComposeStatus currentKeyboardStatus;
 #endif
 
-
 #if __APPLE__
 #include <xwl/xwl_osx.h>
 #endif
 
-
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 i32 xwl_renderer_startup( xwl_renderer_settings_t * settings );
 void xwl_renderer_post( xwl_renderer_settings_t * settings );
@@ -981,7 +982,7 @@ i32 xwl_pollevent( xwl_event_t *event )
 #ifdef _WIN32
 	MSG msg;
 
-	if ( PeekMessage( &msg, 0, 0, 0, PM_REMOVE ) )
+	while ( PeekMessage( &msg, 0, 0, 0, PM_REMOVE ) )
 	{
 		TranslateMessage( &msg );
 		DispatchMessage( &msg );
@@ -1233,3 +1234,7 @@ void xwl_set_callback( xwl_event_callback cb )
 {
 	xwl_callback = cb;
 }
+
+#ifdef __cplusplus
+}; // extern "C"
+#endif

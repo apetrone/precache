@@ -13,6 +13,10 @@
 #include <OpenGL/OpenGL.h>
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if _WIN32
 i32 xwl_renderer_startup( xwl_renderer_settings_t * settings )
 {
@@ -162,4 +166,8 @@ void xwl_renderer_shutdown( xwl_renderer_settings_t * settings )
 }
 
 
+#endif
+
+#ifdef __cplusplus
+}; // extern "C"
 #endif

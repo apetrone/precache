@@ -573,8 +573,7 @@ void xwl_pollevent_osx( xwl_event_t * e )
 	NSLog( @"windowResized" );
 }
 
-
--(void) mouseMoved:(NSEvent *) theEvent
+void dispatchMouseMoveEvent(NSEvent * theEvent)
 {
 	xwl_event_t ev = {0};
 	u16 titleBarHeight;
@@ -598,6 +597,11 @@ void xwl_pollevent_osx( xwl_event_t * e )
 	{
 		xwl_send_event( &ev );
 	}
+}
+
+-(void) mouseMoved:(NSEvent *) theEvent
+{
+	dispatchMouseMoveEvent( theEvent );
 	
 	//NSLog(@"mouseMoved");
 }
@@ -620,7 +624,9 @@ void xwl_pollevent_osx( xwl_event_t * e )
 
 -(void) mouseDragged:(NSEvent *) theEvent
 {
-	//NSLog( @"Mouse Dragged" );
+	dispatchMouseMoveEvent( theEvent );
+	
+	//NSLog( @"mouseDragged" );
 }
 
 
@@ -642,6 +648,7 @@ void xwl_pollevent_osx( xwl_event_t * e )
 
 -(void) rightMouseDragged:(NSEvent *) theEvent
 {
+	dispatchMouseMoveEvent( theEvent );
 	//NSLog( @"rightMouseDragged" );
 }
 
@@ -664,6 +671,7 @@ void xwl_pollevent_osx( xwl_event_t * e )
 
 -(void) otherMouseDragged:(NSEvent *) theEvent
 {
+	dispatchMouseMoveEvent( theEvent );
 	//NSLog( @"otherMouseDragged" );
 }
 
