@@ -719,6 +719,10 @@ void dispatchMouseMoveEvent(NSEvent * theEvent)
 				[text setString: @""];
 			}
 		}
+		else {
+			NSLog( @"Event Keycode: %i", [event keyCode] );
+		}
+
 	}
 	else
 	{
@@ -739,6 +743,13 @@ void dispatchMouseMoveEvent(NSEvent * theEvent)
 		if (ev.key == XWLK_INVALID)
 		{
 			ev.key = NonLocalizedKeys([event keyCode]);
+			
+			if ( ev.key == XWLK_BACKSPACE )
+			{
+				ev.unicode = 8;
+				ev.type = XWLE_TEXT;
+				xwl_send_event( &ev );
+			}
 		}
 		
 		if (ev.key == XWLK_INVALID)
@@ -746,7 +757,7 @@ void dispatchMouseMoveEvent(NSEvent * theEvent)
 			NSLog( @"Unknown key code: %i", [event keyCode] );
 		}
 		
-		
+		ev.type = XWLE_KEYPRESSED;
 		// send the KeyPressed event
 		xwl_send_event( &ev );
 	}
@@ -754,8 +765,7 @@ void dispatchMouseMoveEvent(NSEvent * theEvent)
 	{
 		//[super keyDown: event];
 	}
-	
-	
+
 	/*
 	 NSUInteger modifierFlags = [event modifierFlags];
 	 if ( modifierFlags & NSAlternateKeyMask )
@@ -768,7 +778,7 @@ void dispatchMouseMoveEvent(NSEvent * theEvent)
 	 NSLog( @"system" );
 	 */
 
-	NSLog( @"MyOpenGLView keyDown" );
+	//NSLog( @"MyOpenGLView keyDown" );
 	//[super keyDown: event];
 }
 
@@ -813,7 +823,7 @@ void dispatchMouseMoveEvent(NSEvent * theEvent)
 		//[super keyUp: event];
 	}
 #endif
-	NSLog( @"MyOpenGLView keyUp" );
+	//NSLog( @"MyOpenGLView keyUp" );
 	[super keyUp: event];
 }
 

@@ -129,7 +129,7 @@ void xwl_renderer_post( xwl_renderer_settings_t * settings )
     if ( !settings || !settings->display || !settings->window )
         return;
 
-    glXSwapBuffers( settings->display, (int)settings->window->handle );
+    glXSwapBuffers( settings->display, (GLXDrawable)settings->window->handle );
 }
 
 void xwl_renderer_shutdown( xwl_renderer_settings_t * settings )
