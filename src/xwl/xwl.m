@@ -1,12 +1,28 @@
 #include <xwl/xwl.h>
 #include <xwl/xwl_osx.h>
 
-NSAutoreleasePool *pool = 0;
+// This is a replacement for NSLog. There are two new macros: LOG and DLOG. 
+// LOG will always write, while DLOG will only work when DEBUG is defined.
+// log used / adapted from: http://iphoneincubator.com/blog/
+#define LOG( fmt, ... )	NSLog( @"%s (%d) " fmt, __PRETTY_FUNCTION__, __LINE__, ## __VA_ARGS__ )
+
+#if defined( DEBUG )
+#define DLOG LOG
+#else
+#define DLOG( fmt, ... )
+#endif
+
+
+#if !TARGET_OS_IPHONE
 NSApplication * application = 0;
-xwlDelegate *appDelegate = 0;
+NSAutoreleasePool *pool = 0;
+xwlDelegate * appDelegate = 0;
+#endif
 
 #define XWLWINDOW xwlWindow
  ////////////////////////////////////////////////////////
+
+#if !TARGET_OS_IPHONE
 u32 LocalizedKeys(unichar ch)
  {
 	 switch (ch) 
@@ -260,12 +276,14 @@ u32 NonLocalizedKeys(unsigned short keycode)
 		default:                        return 0;
 	}
 }
+#endif
 
 
-
-
-
+// the implementation for xwlDelegate is provided for the Mac version
+// however, the iPhone version requires a little more customization, so it is separate from XWL.
+#if !TARGET_OS_IPHONE
 @implementation xwlDelegate
+
 -(void)keyDown:(NSEvent*)event
 {
 	NSLog( @"xwlDelegate keyDown" );
@@ -428,15 +446,16 @@ u32 NonLocalizedKeys(unsigned short keycode)
 -(void) applicationDidFinishLaunching:(NSNotification*)notification
 {
 	NSLog( @"Application finished launching?" );
-	
-	//[self myGameInit];
 }
-
-
 @end
+#endif
 
 void xwl_osx_startup()
 {
+#if !TARGET_OS_IPHONE
+	pool = [[NSAutoreleasePool alloc] init];
+	appDelegate = [[xwlDelegate alloc] init];
+	
 	// straight from SFML-2.0
 	ProcessSerialNumber psn;
 	// Set the process as a normal application so it can get focus.
@@ -447,13 +466,14 @@ void xwl_osx_startup()
 	}
 	
 	// Tell the application to stop bouncing in the Dock.
-	[[NSApplication sharedApplication] finishLaunching];
+	//[[NSApplication sharedApplication] finishLaunching];
 	// NOTE : This last call won't harm anything even if SFML window was
 	// created with an external handle.
+	// NOTE2: Removing this call in OSX 10.7 fixes "_createMenuRef called with existing principal MenuRef" Unhandled exception.
 	
-	pool = [[NSAutoreleasePool alloc] init];
+
 	application = [NSApplication sharedApplication];
-	appDelegate = [[xwlDelegate alloc] init];
+	
 	
 	// set application handler here
 	[application setDelegate: appDelegate];
@@ -462,19 +482,38 @@ void xwl_osx_startup()
 	
 	// setup the app menu
 	[application finishLaunching];
+#endif
 }
 
 void xwl_osx_shutdown()
-{	
+{
+#if !TARGET_OS_IPHONE
 	[application setDelegate: nil ];
 	[application release];
 	
 	[appDelegate release];
-	appDelegate = 0;
+	appDelegate = 0;	
+#endif
+}
+
+void xwl_osx_activate( xwl_window_t * window )
+{
+	if ( !window || !window->view )
+		return;
+	
+#if TARGET_OS_IPHONE
+	[((EAGLView*)window->view) begin];
+#else
+	[[((MyOpenGLView*)window->view) getContext] makeCurrentContext];
+#endif
 }
 
 void xwl_pollevent_osx( xwl_event_t * e )
 {
+#if TARGET_OS_IPHONE
+	while( CFRunLoopRunInMode( kCFRunLoopDefaultMode, 0.002, TRUE) == kCFRunLoopRunHandledSource) {}
+	
+#elif TARGET_OS_MAC
 	NSEvent * event = [NSApp nextEventMatchingMask:NSAnyEventMask 
 										 untilDate: [NSDate distantPast]
 											inMode: NSDefaultRunLoopMode
@@ -487,10 +526,14 @@ void xwl_pollevent_osx( xwl_event_t * e )
 	}
 	
 	//[event release]; // is this needed?
+#endif
 }
 
-
+#if !TARGET_OS_IPHONE
 @implementation MyOpenGLView
+
+@synthesize context = ctx;
+
 -(id)initWithFrame:(NSRect)frameRect
 {
 	self = [super initWithFrame: frameRect];
@@ -854,17 +897,102 @@ void dispatchMouseMoveEvent(NSEvent * theEvent)
 }
 
 @end
+#endif
+
+#if TARGET_OS_IPHONE
+#elif TARGET_OS_MAC
+
+// OpenGL 3.2 is only supported on MacOS X Lion and later
+// CGL_VERSION_1_3 is defined as 1 on MacOS X Lion and later
+#if CGL_VERSION_1_3
+	#import <OpenGL/gl3.h>
+#else
+	#import <OpenGL/gl.h>
+#endif
 
 
-MyOpenGLView* setup_rendering( XWLWINDOW * handle )
+NSOpenGLPixelFormatAttribute * xwl_attribs_to_native( u32 * attribs )
+{
+	// count attribs
+	int total_attribs;
+	int i;
+	NSOpenGLPixelFormatAttribute * outattribs;
+
+	for( total_attribs = 0; attribs[total_attribs] != 0; ++total_attribs ) {}
+	
+	outattribs = (NSOpenGLPixelFormatAttribute*)malloc( (total_attribs+2) * sizeof(NSOpenGLPixelFormatAttribute) );
+	outattribs[ total_attribs+1 ] = 0;
+	outattribs[ total_attribs ] = NSOpenGLPFAAccelerated;
+	
+	for( i = 0; i < total_attribs; )
+	{
+		switch( attribs[i] )
+		{
+			case XWL_GL_DOUBLEBUFFER:
+			{
+				outattribs[ i ] = NSOpenGLPFADoubleBuffer;
+				i++;
+				break;
+			}
+				
+#if (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7) && CGL_VERSION_1_3 > 0
+			case XWL_GL_PROFILE:
+			{
+				outattribs[ i ] = NSOpenGLPFAOpenGLProfile;
+				i++;
+				if ( attribs[i] == XWL_GLPROFILE_CORE3_2 )
+					outattribs[ i ] = NSOpenGLProfileVersion3_2Core;
+				else if ( attribs[i] == XWL_GLPROFILE_LEGACY )
+					outattribs[ i ] = NSOpenGLProfileVersionLegacy;
+				i++;
+				break;
+			}
+#endif
+			default: i++;
+		}
+	}
+	
+	
+	
+	return outattribs;
+}
+
+MyOpenGLView* setup_rendering( XWLWINDOW * handle, u32 * xwlattribs )
 {
 	NSOpenGLContext * ctx;
 	NSOpenGLPixelFormat * format;
 	MyOpenGLView * view;
+	NSOpenGLPixelFormatAttribute * attribs;
+	NSOpenGLPixelFormatAttribute default_attribs[] = { 
+		NSOpenGLPFADoubleBuffer,
+		NSOpenGLPFAAccelerated,
+		NSOpenGLPFAWindow,
+		NSOpenGLPFAColorSize, 24,
+#if (MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7) && CGL_VERSION_1_3 > 0
+		NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersionLegacy,
+#endif
+		0
+	};
 	
 	// choose pixel format
-	NSOpenGLPixelFormatAttribute attribs[] = { NSOpenGLPFAClosestPolicy, NSOpenGLPFADoubleBuffer, NSOpenGLPFAAccelerated, NSOpenGLPFAWindow, NSOpenGLPFAColorSize, 24, 0 };
+	if ( xwlattribs )
+	{
+		attribs = xwl_attribs_to_native( xwlattribs );
+	}
+	else
+	{
+		attribs = default_attribs;
+	}
+	
+
 	format = [[NSOpenGLPixelFormat alloc] initWithAttributes: attribs];
+	
+	if ( xwlattribs )
+	{
+		free( attribs );
+	}
+	
+	attribs = nil;
 	
 	if ( format == nil )
 	{
@@ -902,36 +1030,127 @@ MyOpenGLView* setup_rendering( XWLWINDOW * handle )
 	
 	return view;
 }
+#endif
 
-void xwl_setup_osx_rendering( xwl_window_t * window )
+void xwl_setup_osx_rendering( xwl_window_t * window, u32 * attribs )
 {
+#if TARGET_OS_IPHONE
+	EAGLView * view = [[[EAGLView alloc] initWithFrame: [UIScreen mainScreen].bounds] retain];
+	if ( view )
+	{
+		[view startup];
+		[(xwlWindow*)window->handle addSubview: view];
+		((xwlWindow*)window->handle).render = view;
+		window->view = view;
+	}
+#else
 	MyOpenGLView * view;
-	view = setup_rendering( window->handle );
+	view = setup_rendering( window->handle, attribs );
 	
 	if ( view )
 	{
 		((xwlWindow*)window->handle).render = view;
 		window->view = view;
+		NSOpenGLContext * context = view->ctx;
+		
+		// enable v-sync
+		GLint sync = 1;
+		[context setValues: &sync forParameter:NSOpenGLCPSwapInterval]; 
 	}
+	
+	
+#endif
+}
+
+void * xwl_osx_rendering_context( xwl_window_t * window )
+{
+#if TARGET_OS_IPHONE
+	return 0;
+#else
+	MyOpenGLView * view = ((xwlWindow*)window->handle).render;
+	
+	if ( !view )
+	{
+		return 0;
+	}
+	
+	return view->ctx;
+#endif
 }
 
 void xwl_osx_finish( xwl_window_t * window )
 {
 	if ( !window || !window->view )
 		return;
-
+	
+#if TARGET_OS_IPHONE
+	[((EAGLView*)window->view) end];
+#else
 	[[((MyOpenGLView*)window->view) getContext] flushBuffer];
+#endif
 }
 
 
 
 xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params, const char * title )
 {
+	printf( "xwl_create_osx_window\n" );
+	xwl_window_handle_t * wh = 0;
+	XWLWINDOW * handle;
+	
+#if TARGET_OS_IPHONE
+
+	// force OpenGL on iPhone
+	params->flags |= XWL_OPENGL;
+	
+	float statusBarHeight = [UIApplication sharedApplication].statusBarFrame.size.height;
+	//DLOG( "StatusBarFrame: %g", statusBarHeight );
+	CGRect frame = [[UIScreen mainScreen] bounds];
+	
+	handle = [[xwlWindow alloc] initWithFrame: [[UIScreen mainScreen] bounds]];
+	
+	// move the origin ONLY IF +Y is UP in OpenGL
+	//frame.origin.y += statusBarHeight;
+	frame.size.height += statusBarHeight;
+	handle.frame = frame;
+	
+	[handle setBackgroundColor: [UIColor blackColor]];
+	[handle setUserInteractionEnabled: YES];
+	[handle setMultipleTouchEnabled: YES];
+	[handle makeKeyAndVisible];
+	
+	xwlDelegate * delegate = (xwlDelegate*)[[UIApplication sharedApplication] delegate];
+	if ( delegate != 0 )
+	{
+		if ( handle != 0 )
+		{
+			delegate.window = handle;
+			
+			wh = xwl_get_unused_window();
+			wh->handle.handle = handle;
+			//wh->handle.view = delegate.glView;
+			
+			params->width = [handle bounds].size.width;
+			params->height = [handle bounds].size.height;			
+		}
+		else
+		{
+			printf( "delegate.window is NOT valid\n" );
+		}
+
+	}
+	else
+	{
+		printf( "delegate is null\n" );
+	}
+	
+	return wh;
+	
+#else
 	NSRect frame;
 	NSPoint origin;
 	i32 windowMask;
-	xwl_window_handle_t *wh = 0;
-	XWLWINDOW * handle;
+	NSRect mainScreenFrame;
 
 	// full screen
 	
@@ -953,6 +1172,10 @@ xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params, const c
 	
 	frame = NSMakeRect( 0, 0, params->width, params->height );
 	
+	// get this screen's dimensions
+	mainScreenFrame = [[NSScreen mainScreen] frame];
+	//NSLog( @"DIMS: %g %g", mainScreenFrame.size.width, mainScreenFrame.size.height );
+	
 	handle = [[XWLWINDOW alloc] initWithContentRect: frame styleMask: windowMask backing: NSBackingStoreBuffered defer: NO];
 	[handle autorelease];
 	
@@ -970,7 +1193,8 @@ xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params, const c
 
 	[handle setDelegate: appDelegate ];
 
-	origin = NSMakePoint( 0, 0 );
+	// try to center the window
+	origin = NSMakePoint( (mainScreenFrame.size.width/2) - (params->width/2), (mainScreenFrame.size.height/2) - (params->height/2) );
 	
 	[handle center];
 	[handle setFrameOrigin: origin];
@@ -988,8 +1212,8 @@ xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params, const c
 		wh->handle.handle = handle;
 	}
 
-	
 	return wh;
+#endif
 }
 
 

@@ -21,9 +21,11 @@ extern "C" {
 #endif
 
 #elif __APPLE__
+#include <TargetConditionals.h>
 #endif
 
-
+#define XWL_MAX_TOUCHES 5
+#define XWL_MAX_WINDOW_ATTRIBS 10
 
 #ifndef Z_TYPES
 typedef signed char i8;
@@ -190,7 +192,10 @@ enum
 	XWLE_CLOSED,
 	XWLE_LOSTFOCUS,
 	XWLE_GAINFOCUS,
-	XWLE_TEXT
+	XWLE_TEXT,
+	XWLE_TOUCHES_BEGAN,
+	XWLE_TOUCHES_MOVED,
+	XWLE_TOUCHES_END
 };
 
 // flags
@@ -200,6 +205,20 @@ enum
 	XWL_FULLSCREEN = 1, // start window full screen
 	XWL_NORESIZE = 2, // disable window resizing,
 	XWL_OPENGL = 4, // setup opengl rendering
+};
+
+// OpenGL Attributes
+enum
+{
+	XWL_GL_NOATTRIB = 1,
+	XWL_GL_PROFILE, // ignored on Mac OSX < 10.7
+	XWL_GL_DOUBLEBUFFER,
+};
+
+enum
+{
+	XWL_GLPROFILE_LEGACY = 1,
+	XWL_GLPROFILE_CORE3_2
 };
 
 typedef struct xwl_displaymode_s
@@ -225,7 +244,7 @@ typedef struct xwl_window_s
 	void * view;
 #endif
 } xwl_window_t;
-
+	
 typedef struct xwl_windowparams_s
 {
 	u32 width;
@@ -236,6 +255,13 @@ typedef struct xwl_windowparams_s
 	void * userdata;
 	char * title;
 } xwl_windowparams_t;
+	
+typedef struct
+{
+	float x;
+	float y;
+	
+} xwl_touch_t;
 
 typedef struct xwl_event_s
 {
@@ -269,11 +295,12 @@ typedef struct xwl_event_s
 	i16 button;
 	i16 keymods;
 
+	xwl_touch_t touches[ XWL_MAX_TOUCHES ];
 } xwl_event_t;
 
 
 typedef void (*xwl_event_callback)( xwl_event_t * );
-
+	
 // returns 0 on failure
 // returns 1 on success
 i32 xwl_startup();
@@ -287,12 +314,10 @@ i32 xwl_pollevent( xwl_event_t *event );
 
 // returns 0 on failure
 // tite is a UTF-8 encoded string
-xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title );
-
+xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title, u32 * attribs );
 
 // set the event callback
 void xwl_set_callback( xwl_event_callback cb );
-
 
 const char * xwl_key_to_string( i32 key );
 const char * xwl_event_to_string( i32 event_type );
@@ -314,10 +339,10 @@ typedef struct xwl_window_handle_s
 
 xwl_window_handle_t *xwl_get_unused_window();
 void xwl_send_event( xwl_event_t * ev );
-void xwl_setup_rendering( xwl_window_t * window );
+void xwl_setup_rendering( xwl_window_t * window, u32 * attribs );
 void xwl_finish();
-
-
+void xwl_activate( xwl_window_t * window ); // activate this window's rendering context
+void *xwl_rendering_context( xwl_window_t * window );
 
 // -- platform specifics
 typedef struct xwl_renderer_settings_s

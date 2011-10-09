@@ -17,7 +17,7 @@ project "precache"
 	uuid( "e713b970-81b8-11e0-b278-0800200c9a66" )
 	platforms{ "x32", "x64" }
 
-	kind "WindowedApp"
+	kind ("WindowedApp")
 	language ("C")
 	baseDefines = {}
 	

@@ -27,9 +27,10 @@ static XComposeStatus currentKeyboardStatus;
 extern "C" {
 #endif
 
-i32 xwl_renderer_startup( xwl_renderer_settings_t * settings );
+i32 xwl_renderer_startup( xwl_renderer_settings_t * settings, u32 * attribs );
 void xwl_renderer_post( xwl_renderer_settings_t * settings );
 void xwl_renderer_shutdown( xwl_renderer_settings_t * settings );
+void xwl_renderer_activate( xwl_renderer_settings_t * settings );
 
 #define XWL_MAX_WINDOW_HANDLES 4
 static xwl_window_handle_t xwl_windowHandles[ XWL_MAX_WINDOW_HANDLES ];
@@ -42,6 +43,10 @@ const char * xwl_get_error()
     return xwlerror;
 }
 
+#define XWL_MAX_EVENTS 256
+unsigned int event_index = 0;
+unsigned int event_read_ptr = 0;
+static xwl_event_t eventList[ XWL_MAX_EVENTS ];
 
 xwl_window_handle_t *xwl_get_unused_window()
 {
@@ -67,18 +72,42 @@ void xwl_send_event( xwl_event_t * ev )
 	}
 	else // otherwise, queue the event
 	{
+		memcpy( &eventList[ event_index++ ], ev, sizeof(xwl_event_t) );
+		event_index = event_index % XWL_MAX_EVENTS;
 	}
 } // xwl_send_event
 
-void xwl_setup_rendering( xwl_window_t * window )
+void xwl_setup_rendering( xwl_window_t * window, u32 * attribs )
 {
 #if _WIN32
 
 #endif
 
 #if __APPLE__
-	xwl_setup_osx_rendering( window );
+	xwl_setup_osx_rendering( window, attribs );
 #endif
+}
+	
+void *xwl_rendering_context(xwl_window_t * window )
+{
+#if __APPLE__ && TARGET_OS_MAC
+	return xwl_osx_rendering_context( window );
+#else
+	return 0;
+#endif
+}
+	
+void xwl_activate( xwl_window_t * window )
+{
+	xwl_renderer_settings_t cfg;
+	
+	if ( !window )
+	{
+		return;
+	}
+	
+	cfg.window = window;
+	xwl_renderer_activate( &cfg );
 }
 
 void xwl_finish()
@@ -1042,11 +1071,16 @@ i32 xwl_pollevent( xwl_event_t *event )
 #if __APPLE__
 	xwl_pollevent_osx( event );
 #endif
+
+
+	// get the last event off our event list
+	memcpy( event, &eventList[ event_read_ptr++ ], sizeof(xwl_event_t) );
+	event_read_ptr = event_read_ptr % XWL_MAX_EVENTS;
 	return 0;
 }
 
 
-xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title )
+xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title, u32 * attribs )
 {
 	xwl_window_handle_t * wh = 0;
     xwl_renderer_settings_t cfg;
@@ -1058,21 +1092,32 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title 
 	//memset( windowName, 0, 128 );
 	HWND handle;
 
-	style |= WS_MINIMIZEBOX | WS_CAPTION | WS_BORDER | WS_SYSMENU;
+
 
 	if ( title == 0 )
+	{
 		title = "Untitled Window";
+	}
 
 	if ( !(params->flags & XWL_FULLSCREEN) )
 	{
 		RECT r = { 0, 0, params->width, params->height };
+		style |= WS_MINIMIZEBOX | WS_CAPTION | WS_BORDER | WS_SYSMENU;
+		if ( !(params->flags & XWL_NORESIZE) )
+		{
+			style |= WS_OVERLAPPEDWINDOW;
+		}
+		
 		AdjustWindowRect( &r, style, 0 );
 		params->width = (r.right - r.left);
 		params->height = (r.bottom - r.top);
+
+	}
+	else
+	{
+		style |= WS_POPUP;
 	}
 
-	if ( !(params->flags & XWL_NORESIZE) )
-		style |= WS_OVERLAPPEDWINDOW;
 
 	MultiByteToWideChar( CP_UTF8, 0, title, -1, windowName, 128 );
 
@@ -1120,12 +1165,12 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title 
 	if ( (params->flags & XWL_OPENGL) )
 	{
 	    cfg.window = &wh->handle;
-		xwl_renderer_startup( &cfg );
+		xwl_renderer_startup( &cfg, attribs );
 	}
 #endif
 
 #ifdef LINUX
-    XSetWindowAttributes attribs;
+    XSetWindowAttributes window_attribs;
     XVisualInfo * info;
     Window handle;
 
@@ -1149,7 +1194,7 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title 
         return 0;
     }
 
-    attribs.event_mask = FocusChangeMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | StructureNotifyMask | EnterWindowMask | LeaveWindowMask;
+    window_attribs.event_mask = FocusChangeMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask | KeyPressMask | KeyReleaseMask | StructureNotifyMask | EnterWindowMask | LeaveWindowMask;
     cfg.display = currentDisplay;
     cfg.screen = currentScreen;
 
@@ -1158,14 +1203,14 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title 
 
     cwattrs = CWEventMask;
 
-    xwl_renderer_startup( &cfg );
+    xwl_renderer_startup( &cfg, attribs );
 
     printf( "Creating color map\n" );
     colormap = XCreateColormap( currentDisplay, RootWindow(currentDisplay, currentScreen), cfg.visual->visual, AllocNone );
-    attribs.colormap = colormap;
+    window_attribs.colormap = colormap;
 
     printf( "Now creating window...\n" );
-    handle = XCreateWindow( currentDisplay, RootWindow(currentDisplay, currentScreen), 0, 0, params->width, params->height, 0, cfg.visual->depth, InputOutput, cfg.visual->visual, CWColormap | CWEventMask, &attribs );
+    handle = XCreateWindow( currentDisplay, RootWindow(currentDisplay, currentScreen), 0, 0, params->width, params->height, 0, cfg.visual->depth, InputOutput, cfg.visual->visual, CWColormap | CWEventMask, &window_attribs );
 
     if ( handle == 0 )
     {
@@ -1219,7 +1264,7 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title 
 
     if ( (params->flags & XWL_OPENGL) )
     {
-        xwl_renderer_startup( &cfg );
+        xwl_renderer_startup( &cfg, attribs );
     }
 
 #endif

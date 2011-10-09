@@ -1,5 +1,5 @@
 #include "http.h"
-
+#include "platform.h"
 #include "log.h"
 
 #if LINUX || __APPLE__
@@ -139,6 +139,8 @@ void http_download_file( const char * url, const char * temporaryFilePath, http_
 
     dprintf( "* HTTP: <- Sent %i bytes to server...\n", bytesSent );
     state->flags = 1;
+
+	platform_makedirs( temporaryFilePath );
 
     // open temporary file
     state->handle = fopen( temporaryFilePath, "wb" );

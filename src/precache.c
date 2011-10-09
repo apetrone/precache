@@ -14,6 +14,7 @@
 #include "font.h"
 #include "log.h"
 #include "timer.h"
+#include "platform.h"
 
 #if _WIN32
 	#define WIN32_LEAN_AND_MEAN
@@ -48,6 +49,9 @@ char err1[ 1024 ];
 char err2[ 1024 ];
 
 #define PRECACHE_TIMEOUT_MS 3000
+
+#define PRECACHE_URL "http://192.168.0.100/precache/mp"
+#define PRECACHE_WINDOW_TITLE "Precache Test"
 
 enum PrecacheState
 {
@@ -828,6 +832,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	char msg[ 256 ];
 	char msg2[ 256 ];
 	unsigned char msg_color[4];
+	int created_directory;
 
 
 	int textpos[ 4 ];
@@ -882,7 +887,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	memset( ps.localpath, 0, MAX_PATH_SIZE );
 
     // the directory which contains the precache.list
-	strcpy( ps.remotepath, "http://www.gesturebox.net/precache/test1" );
+	strcpy( ps.remotepath, PRECACHE_URL );
 
 	platform_binary_directory( ps.localpath, MAX_PATH_SIZE );
 
@@ -947,7 +952,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     xwl_startup();
 
 
-    window = xwl_create_window( &p, "Precache Test" );
+    window = xwl_create_window( &p, PRECACHE_WINDOW_TITLE, 0 );
 
     if ( !window )
     {
@@ -1064,7 +1069,12 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
                     // http://pubs.opengroup.org/onlinepubs/009695399/functions/mkdir.html
                     mkdir( ps.localpath, (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH ) );
 #else
-					CreateDirectoryA( ps.localpath, 0 );
+					created_directory = CreateDirectoryA( ps.localpath, 0 );
+
+					if ( !created_directory )
+					{
+						log_msg( "* CreateDirectory FAILED: [%s]\n", ps.localpath );
+					}
 #endif
 
 					strcpy( msg, "Calculating MD5 checksums..." );

@@ -10,7 +10,10 @@
 #include <GL/gl.h>
 #include <GL/glx.h>
 #elif __APPLE__
-#include <OpenGL/OpenGL.h>
+#if TARGET_OS_IPHONE
+#elif TARGET_OS_MAC
+	#include <OpenGL/OpenGL.h>
+#endif
 #endif
 
 #ifdef __cplusplus
@@ -18,7 +21,7 @@ extern "C" {
 #endif
 
 #if _WIN32
-i32 xwl_renderer_startup( xwl_renderer_settings_t * settings )
+i32 xwl_renderer_startup( xwl_renderer_settings_t * settings, u32 * attribs )
 {
 	HGLRC glrc;
 	PIXELFORMATDESCRIPTOR pfd = {0};
@@ -82,11 +85,15 @@ void xwl_renderer_shutdown( xwl_renderer_settings_t * settings )
 
 	ReleaseDC( (HWND)settings->window->handle, settings->window->dc );
 }
+	
+void xwl_renderer_activate( xwl_renderer_settings_t * settings )
+{
+}
 #endif
 
 
 #if LINUX
-i32 xwl_renderer_startup( xwl_renderer_settings_t * settings )
+i32 xwl_renderer_startup( xwl_renderer_settings_t * settings, u32 * attribs )
 {
     XWindowAttributes att;
     Window window = (Window)settings->window;
@@ -137,6 +144,10 @@ void xwl_renderer_shutdown( xwl_renderer_settings_t * settings )
     glXMakeCurrent( settings->display, None, 0 );
     glXDestroyContext( settings->display, settings->window->context );
 }
+	
+void xwl_renderer_activate( xwl_renderer_settings_t * settings )
+{
+}
 #endif
 
 
@@ -144,13 +155,14 @@ void xwl_renderer_shutdown( xwl_renderer_settings_t * settings )
 
 #if __APPLE__
 void xwl_pollevent_osx( xwl_event_t * event );
-void xwl_setup_osx_rendering( xwl_window_t * window );
+void xwl_setup_osx_rendering( xwl_window_t * window, u32 * attribs );
 void xwl_osx_finish( xwl_window_t * window );
+void xwl_osx_activate( xwl_window_t * window );
 
-i32 xwl_renderer_startup( xwl_renderer_settings_t * settings )
+i32 xwl_renderer_startup( xwl_renderer_settings_t * settings, u32 * attribs )
 {
 	// setup an opengl view
-	xwl_setup_osx_rendering( settings->window );
+	xwl_setup_osx_rendering( settings->window, attribs );
 
 	return 1;
 }
@@ -165,7 +177,10 @@ void xwl_renderer_shutdown( xwl_renderer_settings_t * settings )
 
 }
 
-
+void xwl_renderer_activate( xwl_renderer_settings_t * settings )
+{
+	xwl_osx_activate( settings->window );
+}
 #endif
 
 #ifdef __cplusplus
