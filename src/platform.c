@@ -24,6 +24,21 @@ extern "C"
 #endif
 
 
+void platform_conform_slashes( char * path, int path_len )
+{
+#if _WIN32
+	int i;
+
+	for( i = 0; i < path_len; ++i )
+	{
+		if ( path[i] == '/' )
+		{
+			path[i] = '\\';
+		}
+	}
+#endif
+}
+
 // ------------------------------------------------------------------
 int platform_operating_directory( char * path, int size )
 {

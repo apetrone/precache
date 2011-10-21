@@ -47,6 +47,8 @@ extern "C"
     // path will not have a trailing slash
     int platform_operating_directory( char * path, int size );
 
+    void platform_conform_slashes( char * path, int path_len );
+
 	// normalize slashes in path to this platform's conventions
 	void platform_path_normalize( char * path, int size );
 

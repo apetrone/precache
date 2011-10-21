@@ -1,23 +1,18 @@
 #include <stdio.h>
-
-// windows.h must not be included before winsock2.h
-#if _WIN32
-#include <winsock2.h>
-#include <windows.h>
-#endif
-
 #include <xwl/xwl.h>
-#include <http.h>
+
 #include <thread.h>
-#include "JSON_parser.h"
-#include "md5.h"
 #include "font.h"
 #include "log.h"
 #include "timer.h"
 #include "platform.h"
+#include "precachelib.h"
+#include "precache.h"
 
 #if _WIN32
 	#define WIN32_LEAN_AND_MEAN
+	#include <winsock2.h>
+	// windows.h must not be included before winsock2.h
 	#include <windows.h>
 #endif
 
@@ -32,153 +27,13 @@
 #endif
 
 
-#if _WIN32
-    #define MAX_PATH_SIZE MAX_PATH
-    #define PATH_SEPARATOR '\\'
-	#define PATH_SEPARATOR_STRING "\\"
-#elif LINUX || __APPLE__
-    #include <limits.h>
-    #define MAX_PATH_SIZE PATH_MAX
-    #define PATH_SEPARATOR '/'
-	#define PATH_SEPARATOR_STRING "/"
-#endif
 
 
 
-char err1[ 1024 ];
-char err2[ 1024 ];
-
-#define PRECACHE_TIMEOUT_MS 3000
-
-#define PRECACHE_URL "http://192.168.0.100/precache/mp"
-#define PRECACHE_WINDOW_TITLE "Precache Test"
-
-enum PrecacheState
-{
-	// an invalid state (at startup)
-	PS_INVALID = 0,
-
-	// downloading the precache.list
-	PS_DOWNLOAD_LIST,
-
-	// parsing the locally downloaded precache.list
-	PS_PARSING_LIST,
-
-	// finished parsing list
-	PS_FINISHED_PARSING_LIST,
-
-	// calculating MD5 checksums for local files
-	PS_CALCULATING_CHECKSUMS,
-
-	// download list parse error
-	PS_PARSE_ERROR,
-
-	// download the next file
-	PS_DOWNLOAD_NEXT,
-
-	// error while attempting to download a file
-	PS_DOWNLOAD_ERROR,
-
-	// download timed out; file is incomplete
-	PS_DOWNLOAD_TIMEDOUT,
-
-	// currently downloading
-	PS_DOWNLOADING,
 
 
-};
-
-void platform_conform_slashes( char * path, int path_len )
-{
-#if _WIN32
-	int i;
-
-	for( i = 0; i < path_len; ++i )
-	{
-		if ( path[i] == '/' )
-		{
-			path[i] = '\\';
-		}
-	}
-#endif
-}
-
-// returns the size of the path on success
-// returns 0 on failure
-// path will not have a trailing slash
-int platform_binary_directory( char * path, int size )
-{
-    int result;
-    char * sep;
-
-#if _WIN32
-	result = GetModuleFileNameA( GetModuleHandleA(0), path, size);
-#elif LINUX
-    {
-        // http://www.flipcode.com/archives/Path_To_Executable_On_Linux.shtml
-        char linkname[ 64 ] = {0};
-        pid_t pid;
 
 
-        pid = getpid();
-
-        if ( snprintf(linkname, sizeof(linkname), "/proc/%i/exe", pid ) < 0 )
-        {
-            abort();
-        }
-
-        result = readlink( linkname, path, size );
-
-        if ( result == -1 )
-        {
-            result = 0;
-        }
-        else
-        {
-            path[result] = 0;
-        }
-    }
-#elif __APPLE__
-	extern int _NSGetExecutablePath(char* buf, uint32_t* bufsize);
-	char basepath[1024];
-	uint32_t bpsize = sizeof(basepath);
-
-	if ( _NSGetExecutablePath(basepath, &bpsize) == 0 )
-	{
-		if ( realpath(basepath, path) != 0 )
-		{
-		    result = strlen( path );
-		}
-	}
-	else
-	{
-	    // basepath too small
-	    result = 0;
-	}
-
-#endif
-
-    if ( result != 0 )
-    {
-        sep = strrchr( path, PATH_SEPARATOR );
-
-        if ( sep )
-        {
-            *sep = '\0';
-        }
-    }
-
-
-    return result;
-} // platform_binary_directory
-
-
-typedef char md5_digest_t[ 33 ];
-
-#if LINUX || __APPLE__
-#define strnicmp strncasecmp
-#define stricmp strcasecmp
-#endif
 
 
 int running = 1;
@@ -187,6 +42,12 @@ i32 mx;
 i32 my;
 xwl_windowparams_t p;
 timevalue_t timestate;
+
+typedef struct
+{
+	font_t font;
+} application_state_t;
+application_state_t state;
 
 // temporary OpenGL tests
 #if _WIN32
@@ -209,20 +70,7 @@ timevalue_t timestate;
 #define xwlPrintf //
 #endif
 
-struct button_s;
 
-typedef void (*button_event)( struct button_s * source );
-
-typedef struct button_s
-{
-	i16 width;
-	i16 height;
-	i16 x;
-	i16 y;
-	unsigned char color[4];
-
-	button_event event;
-} button;
 
 button b;
 button bar;
@@ -245,6 +93,8 @@ i32 mouse_inside_button( button * b )
 		return 0;
 	return 1;
 }
+
+
 void callback( xwl_event_t * e )
 {
     xwlPrintf( "event: %s\n", xwl_event_to_string(e->type) );
@@ -307,17 +157,15 @@ void callback( xwl_event_t * e )
 
 void render_button( button * b )
 {
-#if 1
-		glColor3ub( b->color[0], b->color[1], b->color[2] );
-		glBegin( GL_TRIANGLES );
-			glVertex2i( b->x, b->y );
-			glVertex2i( b->x, b->y + b->height );
-			glVertex2i( b->x + b->width, b->y + b->height );
-			glVertex2i( b->x + b->width, b->y + b->height );
-			glVertex2i( b->x + b->width, b->y );
-			glVertex2i( b->x, b->y );
-		glEnd();
-#endif
+	glColor3ub( b->color[0], b->color[1], b->color[2] );
+	glBegin( GL_TRIANGLES );
+		glVertex2i( b->x, b->y );
+		glVertex2i( b->x, b->y + b->height );
+		glVertex2i( b->x + b->width, b->y + b->height );
+		glVertex2i( b->x + b->width, b->y + b->height );
+		glVertex2i( b->x + b->width, b->y );
+		glVertex2i( b->x, b->y );
+	glEnd();
 }
 
 void render_button_frame( button * b, int width, int height )
@@ -394,49 +242,6 @@ void md5_from_path( const char * filename, char * digest )
 
 
 
-typedef struct precache_file_s
-{
-    char path[ 256 ];
-    char checksum[ 33 ];
-    int flags;
-	float timestamp;
-
-    struct precache_file_s * next;
-} precache_file_t;
-
-typedef struct precache_state_s
-{
-    int state;
-    char base[ 128 ];
-    char remotepath[ 256 ]; // a full url to the base folder where this project resides
-    char localpath[ MAX_PATH_SIZE ]; // an absolute path to the folder on the local machine where these files should be placed
-    char precache_file[ MAX_PATH_SIZE ];
-    char currentfilepath[ MAX_PATH_SIZE ];
-
-    precache_file_t * files;
-    precache_file_t * curfile;
-} precache_state_t;
-
-typedef struct precache_parse_state_s
-{
-    int flags;
-    char lastkey[ 128 ];
-    precache_state_t * state;
-} precache_parse_state_t;
-
-#define PRECACHE_STATE_DOWNLOAD_REQUEST 1 // request to download a file
-#define PRECACHE_STATE_DOWNLOAD 2 // downloading a file
-#define PRECACHE_STATE_EXIT 3
-#define PRECACHE_STATE_ERROR 4
-
-typedef struct precache_thread_data_s
-{
-    int state;
-    http_download_state_t * download;
-    precache_state_t * precache;
-} precache_thread_data_t;
-
-#define PRECACHE_TEMP_BUFFER_SIZE 512
 
 static g_thread_id = 0;
 
@@ -486,8 +291,8 @@ THREAD_ENTRY precache_download_thread( void * data )
 					//td->precache->state = PS_DOWNLOAD_TIMEDOUT;
 					td->state = PRECACHE_STATE_EXIT;
 					td->download->error = 1;
-					strcpy( err1, "Timed out while downloading:" );
-					strcpy( err2, remotepath );
+					strcpy( precache->err1, "Timed out while downloading:" );
+					strcpy( precache->err2, remotepath );
 				}
 			}
 
@@ -527,8 +332,8 @@ THREAD_ENTRY precache_download_thread( void * data )
 				else
 				{
 					log_msg( "-> T: %i - Unable to download file: %s\n", thread_id, remotepath );
-					strcpy( err1, "Update failed! File not found:" );
-					strcpy( err2, remotepath );
+					strcpy( precache->err1, "Update failed! File not found:" );
+					strcpy( precache->err2, remotepath );
 				}
 				td->state = PRECACHE_STATE_EXIT;
 			}
@@ -598,191 +403,8 @@ THREAD_ENTRY precache_calculate_checksums( void * data )
 	return 0;
 } // precache_calculate_checksums
 
-static int print( void *ctx, int type, const JSON_value * value )
-{
-    precache_file_t * file;
-    precache_parse_state_t * ps = (precache_parse_state_t*)ctx;
-    //printf( "JSON type: %i | %i\n", type, ps->flags );
-
-    switch( type )
-    {
-        case JSON_T_INTEGER:
-            //printf( "integer: %i\n", (int)value->vu.integer_value );
-            if (ps->flags == 0 )
-            {
-                if (stricmp( ps->lastkey, "version" ) == 0 )
-                {
-                    //printf( "Version is: %i\n", (int)value->vu.integer_value );
-                }
-            }
-            else if ( (ps->flags & 2) )
-            {
-            }
-            break;
-        case JSON_T_ARRAY_BEGIN:
-            ps->flags |= 1;
-            // start reading files
-            break;
-        case JSON_T_ARRAY_END:
-            ps->flags &= ~1;
-            // stopped reading files
-            break;
-        case JSON_T_OBJECT_BEGIN:
-            if ( (ps->flags & 1) )
-            {
-                ps->flags |= 2;
-                // allocate a new file and link it in
-                file = (precache_file_t*)malloc( sizeof(precache_file_t) );
-                memset( file, 0, sizeof(precache_file_t) );
-                file->next = ps->state->files;
-                file->flags = 0;
-                ps->state->files = file;
-                ps->state->curfile = file;
-            }
-
-            break;
-        case JSON_T_OBJECT_END:
-            if ( (ps->flags & 1) )
-                ps->flags &= ~2;
-            break;
-        case JSON_T_KEY:
-            strncpy( ps->lastkey, value->vu.str.value, 127 );
-            //printf( "key: '%s', value = ", ps->lastkey );
-
-            break;
-
-        case JSON_T_STRING:
-            //printf( "string: '%s'\n", value->vu.str.value );
-            if (ps->flags == 0 )
-            {
-                if ( stricmp( ps->lastkey, "base" ) == 0 )
-                {
-                    strncpy( ps->state->base, value->vu.str.value, 127 );
-                    //printf( "Base is: %s\n", ps->state->base );
-                }
-            }
-            else if ( ps->flags & 2 )
-            {
-                if ( stricmp( ps->lastkey, "path" ) == 0 )
-                {
-                    if( ps->state->curfile )
-                    {
-                        strncpy( ps->state->curfile->path, value->vu.str.value, 255 );
-                    }
-                }
-                else if ( stricmp( ps->lastkey, "md5" ) == 0 )
-                {
-                    if( ps->state->curfile )
-                    {
-                        strncpy( ps->state->curfile->checksum, value->vu.str.value, 32 );
-                    }
-                }
-            }
-            break;
-    }
-
-    return 1;
-} // print
 
 
-
-
-int precache_parse_list( precache_state_t * precache )
-{
-    char absolute_path[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
-    JSON_config config;
-    int i;
-    int result = 1;
-    struct JSON_parser_struct * jc = 0;
-    FILE * fp;
-    long fileSize;
-    char * buffer;
-    int linenumber;
-    int colnumber;
-    precache_parse_state_t pstate;
-
-    // construct absolute path to precache list...
-    strcpy( absolute_path, precache->localpath );
-    strcat( absolute_path, precache->curfile->path );
-
-	platform_conform_slashes( absolute_path, PRECACHE_TEMP_BUFFER_SIZE );
-    log_msg( "* precache.list file: %s\n", absolute_path );
-
-    fp = fopen( absolute_path, "rb" );
-
-    if ( !fp )
-        return 0;
-
-    fseek( fp, 0, SEEK_END );
-    fileSize = ftell( fp );
-    fseek( fp, 0, 0 );
-
-    // don't allocate more than X bytes for the buffer. Warn the user?
-
-    // allocate memory for the buffer
-    buffer = (char*)malloc( fileSize+1 );
-    memset( buffer, 0, fileSize+1 );
-
-    fread( buffer, fileSize, 1, fp );
-    fclose( fp );
-
-    // setup precache internal parser state
-    pstate.state = precache;
-    pstate.flags = 0;
-    memset( pstate.lastkey, 0, 128);
-
-    // setup the JSON config for parsing
-    init_JSON_config( &config );
-    config.depth = 19;
-    config.callback = &print;
-    config.allow_comments = 1;
-    config.handle_floats_manually = 0;
-    config.callback_ctx = &pstate;
-
-    jc = new_JSON_parser(&config);
-
-    // no one ever says "line zero"
-    linenumber = 1;
-    colnumber = 0;
-
-    // throw the buffer in the parser
-    for( i = 0; i < fileSize; ++i )
-    {
-        if ( buffer[i] == '\n' )
-        {
-            ++linenumber;
-            colnumber = 0;
-        }
-
-        if ( !JSON_parser_char(jc, buffer[i] ) )
-        {
-            log_msg( "JSON_parser_char: syntax error, col %d, line: %i\n", colnumber, linenumber );
-            strcpy( err1, "Error parsing precache.list" );
-            sprintf( err2, "syntax error: line %i, col %i", linenumber, colnumber );
-            result = 0;
-            break;
-        }
-
-        ++colnumber;
-    }
-
-    if ( !JSON_parser_done(jc) )
-    {
-        log_msg( "JSON_parser_end: syntax error\n" );
-        result = 0;
-    }
-
-    // cleanup resources
-    delete_JSON_parser(jc);
-
-    if ( buffer )
-    {
-        free( buffer );
-    }
-
-	log_msg( "finished parsing precache.list. returning with result: %i\n", result );
-    return result;
-}
 
 
 precache_file_t * precache_locate_next_file( precache_file_t * start )
@@ -809,8 +431,8 @@ precache_file_t * precache_locate_next_file( precache_file_t * start )
 } // precache_locate_next_file
 
 
-#define KB_DIV 1024
-#define MB_DIV 1048576
+
+
 
 #ifndef _WIN32
 int main()
@@ -827,7 +449,6 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     precache_state_t ps;
     precache_thread_data_t tdata;
 	precache_file_t * file;
-    font_t font;
 	char log_path[ 255 ];
 	char msg[ 256 ];
 	char msg2[ 256 ];
@@ -889,7 +510,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     // the directory which contains the precache.list
 	strcpy( ps.remotepath, PRECACHE_URL );
 
-	platform_binary_directory( ps.localpath, MAX_PATH_SIZE );
+	platform_operating_directory( ps.localpath, MAX_PATH_SIZE );
 
 	memset( log_path, 0, 255 );
 	strcpy( log_path, ps.localpath );
@@ -963,11 +584,18 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     xwl_set_callback( callback );
 
     // init font
-    font_load_embedded( &font, font_liberation_mono8, font_liberation_mono8_size );
+    //font_load_embedded( &state.font, font_liberation_mono8, font_liberation_mono8_size );
+    font_load_embedded( &state.font, font_pf_tempesta_seven8, font_pf_tempesta_seven8_size );
 
 	memset( msg, 0, 256 );
 	memset( msg2, 0, 256 );
 	msg_color[0] = msg_color[1] = msg_color[2] = msg_color[3] = 255;
+
+
+#if PRECACHE_TEST
+
+
+#else
 
 	strcpy( msg, "Downloading precache.list..." );
 	log_msg( "* MSG: %s\n", msg );
@@ -1022,21 +650,21 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
         // draw test font string
 
 		// draw black text to act as a drop-shadow
-		font_draw( &font, textpos[0]+2, textpos[1]+2, msg, 0, 0, 0, 255 );
+		font_draw( &state.font, textpos[0]+2, textpos[1]+2, msg, 0, 0, 0, 255 );
 		if ( msg2[0] != 0 )
 		{
-			font_draw( &font, textpos[2]+2, textpos[3]+2, msg2, 0, 0, 0, 255 );
+			font_draw( &state.font, textpos[2]+2, textpos[3]+2, msg2, 0, 0, 0, 255 );
 		}
 
 		// draw foreground text
-        font_draw( &font, textpos[0], textpos[1], msg, msg_color[0], msg_color[1], msg_color[2], msg_color[3] );
+        font_draw( &state.font, textpos[0], textpos[1], msg, msg_color[0], msg_color[1], msg_color[2], msg_color[3] );
 		if ( msg2[0] != 0 )
 		{
-			font_draw( &font, textpos[2], textpos[3], msg2, msg_color[0], msg_color[1], msg_color[2], msg_color[3] );
+			font_draw( &state.font, textpos[2], textpos[3], msg2, msg_color[0], msg_color[1], msg_color[2], msg_color[3] );
 		}
 
 		// render button text
-		font_draw( &font, 380, 114, "Close", 255, 255, 255, 255 );
+		font_draw( &state.font, 380, 114, "Close", 255, 255, 255, 255 );
 
 
         // do a swap of buffers
@@ -1094,8 +722,8 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
                     // precache list error
 					ps.state = PS_PARSE_ERROR;
 
-                    strcpy( msg, err1 );
-                    strcpy( msg2, err2 );
+                    strcpy( msg, ps.err1 );
+                    strcpy( msg2, ps.err2 );
                     msg_color[0] = 255;
                     msg_color[1] = 0;
                     msg_color[2] = 0;
@@ -1210,8 +838,8 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 				}
 				else if ( ps.state == PS_DOWNLOADING )
 				{
-					strcpy( msg, err1 );
-					strcpy( msg2, err2 );
+					strcpy( msg, ps.err1 );
+					strcpy( msg2, ps.err2 );
 					msg_color[0] = 255;
 					msg_color[1] = 0;
 					msg_color[2] = 0;
@@ -1261,6 +889,8 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
 	// cleanup the precache list from the filesystem...
 	unlink( ps.precache_file );
+
+#endif
 
 	log_msg( "precache: shutting down gracefully.\n" );
 
