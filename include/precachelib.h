@@ -114,5 +114,7 @@ typedef struct precache_thread_data_s
 
 typedef char md5_digest_t[ 33 ];
 
+void md5_from_path( const char * filename, char * digest );
 
 int precache_parse_list( precache_state_t * precache );
+precache_file_t * precache_locate_next_file( precache_file_t * start );

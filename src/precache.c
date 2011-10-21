@@ -190,59 +190,6 @@ void render_button_frame( button * b, int width, int height )
 
 mutex_t dl;
 
-
-
-
-void md5_from_path( const char * filename, char * digest )
-{
-	md5_state_t md5state;
-	FILE * fp;
-	size_t fileSize;
-	int loop;
-	char * data;
-	md5_byte_t md5digest[16];
-
-	fp = fopen( filename, "rb" );
-	if ( !fp )
-	{
-        // clear digest
-	    memset( digest, 0, 32 );
-	    return;
-	}
-
-    fseek( fp, 0, SEEK_END );
-    fileSize = ftell( fp );
-    fseek( fp, 0, SEEK_SET );
-
-    // init the state
-    md5_init( &md5state );
-
-    memset( md5digest, 0, 16 );
-
-    data = (char*)malloc( fileSize );
-    fread( data, 1, fileSize, fp );
-
-    // add all bytes from the file
-    md5_append( &md5state, (unsigned char*)data, fileSize );
-
-    // close the file
-    fclose( fp );
-
-    free( data );
-
-    // finish up and get the digest
-    md5_finish( &md5state, md5digest );
-
-    // generate a hex digest; code lifted from the md5main.c source
-    for( loop = 0; loop < 16; ++loop )
-    {
-        sprintf( digest + (loop * 2), "%02x", md5digest[loop] );
-    }
-} // md5_from_path
-
-
-
-
 static g_thread_id = 0;
 
 THREAD_ENTRY precache_download_thread( void * data )
@@ -403,32 +350,6 @@ THREAD_ENTRY precache_calculate_checksums( void * data )
 	return 0;
 } // precache_calculate_checksums
 
-
-
-
-
-precache_file_t * precache_locate_next_file( precache_file_t * start )
-{
-	precache_file_t * cur = start;
-	precache_file_t * next = 0;
-
-	log_msg( "* LOC: start is [%s]\n", start->path );
-	do
-	{
-		// this file hasn't been downloaded...
-		if ( !(cur->flags & 1) )
-		{
-			log_msg( "* LOC: file not downloaded: [%s]\n", cur->path );
-			next = cur;
-			break;
-		}
-
-		log_msg( "* LOC: file downloaded, skipping: [%s]\n", cur->path );
-		cur = cur->next;
-	} while( cur );
-
-	return next;
-} // precache_locate_next_file
 
 
 
