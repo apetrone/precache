@@ -41,6 +41,9 @@ void font_destroy( font_t * font );
 font_charinfo_t * font_get_character( font_t * font, font_char_t c );
 
 
-// temporary...
+// embedded fonts
 extern unsigned char font_liberation_mono8[];
 extern int font_liberation_mono8_size;
+
+extern unsigned char font_pf_tempesta_seven8[];
+extern int font_pf_tempesta_seven8_size;
