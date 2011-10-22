@@ -10,6 +10,7 @@
 #elif __APPLE__
 	#include <sys/stat.h> // for mkdir
 	#include <OpenGL/OpenGL.h>
+	#include <OpenGL/gl.h>
 #elif LINUX
 	#include <errno.h>
 	#include <sys/types.h>

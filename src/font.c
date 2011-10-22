@@ -14,14 +14,15 @@
 
 #if USEGL
     #if _WIN32
-    #include <windows.h>
-    #include <gl/gl.h>
-    #pragma comment( lib, "opengl32.lib" )
+		#include <windows.h>
+		#include <gl/gl.h>
+		#pragma comment( lib, "opengl32.lib" )
     #elif LINUX
-    #include <GL/gl.h>
-    #include <GL/glx.h>
+		#include <GL/gl.h>
+		#include <GL/glx.h>
     #elif __APPLE__
-    #include <OpenGL/OpenGL.h>
+		#include <OpenGL/OpenGL.h>
+		#include <OpenGL/gl.h>
     #endif
 #endif
 

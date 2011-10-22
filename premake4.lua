@@ -31,7 +31,11 @@ project "precache"
 	{ 
 		"include",
 	}	
-	
+
+	if targetOS == "windows" then
+		-- use static runtime on Windows
+		flags { "StaticRuntime" }
+	end
 	if targetOS == "macosx" then
 		files
 		{
@@ -73,9 +77,6 @@ project "precache"
 			"-framework OpenGL"
 		}
 	end
-
-	-- use static runtime on Windows
-	flags { "StaticRuntime" }
 	
 	configuration { "debug" }
 		targetsuffix "d"		
