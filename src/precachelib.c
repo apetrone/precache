@@ -2,7 +2,7 @@
 #include "platform.h"
 #include "log.h"
 
-static int print( void *ctx, int type, const JSON_value * value )
+int parse_json( void *ctx, int type, const JSON_value * value )
 {
     precache_file_t * file;
     precache_parse_state_t * ps = (precache_parse_state_t*)ctx;
@@ -84,7 +84,7 @@ static int print( void *ctx, int type, const JSON_value * value )
 					{
 						strncpy( ps->state->curfile->checksum, value->vu.str.value, 32 );
 					}
-					else if ( stricmp( ps->lastkey, "platform" ) == 0 )
+					else if ( stricmp( ps->lastkey, "os" ) == 0 )
 					{
 						ps->state->curfile->platformid = atoi( value->vu.str.value );
 					}
@@ -146,7 +146,7 @@ int precache_parse_list( precache_state_t * precache )
     // setup the JSON config for parsing
     init_JSON_config( &config );
     config.depth = 19;
-    config.callback = &print;
+	config.callback = &parse_json;
     config.allow_comments = 1;
     config.handle_floats_manually = 0;
     config.callback_ctx = &pstate;
@@ -204,7 +204,7 @@ int precache_parse_list( precache_state_t * precache )
 	}
 
 
-	log_msg( "finished parsing precache.list. returning with result: %i\n", result );
+	//log_msg( "finished parsing precache.list. returning with result: %i\n", result );
     return result;
 }
 
@@ -215,19 +215,19 @@ precache_file_t * precache_locate_next_file( precache_file_t * start )
 	precache_file_t * cur = start;
 	precache_file_t * next = 0;
 
-	log_msg( "* LOC: start is [%s]\n", start->path );
+	//log_msg( "* LOC: start is [%s]\n", start->path );
 	do
 	{
 		// this file hasn't been downloaded... AND
 		// this file matches this is platform agnostic or matches platform ID
 		if ( !(cur->flags & 1) && (cur->platformid == -1 || (cur->platformid == PRECACHE_PLATFORM)) )
 		{
-			log_msg( "* LOC: file not downloaded: [%s]\n", cur->path );
+			//log_msg( "* LOC: file not downloaded: [%s]\n", cur->path );
 			next = cur;
 			break;
 		}
 
-		log_msg( "* LOC: file downloaded, skipping: [%s]\n", cur->path );
+		//log_msg( "* LOC: file downloaded, skipping: [%s]\n", cur->path );
 		cur = cur->next;
 	} while( cur );
 

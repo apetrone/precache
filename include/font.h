@@ -37,6 +37,7 @@ void font_create( font_t * font );
 void font_load_embedded( font_t * font, const unsigned char * data, int dataSize );
 void font_draw( font_t * font, int x, int y, const char * str, unsigned char r, unsigned char g, unsigned char b, unsigned char a );
 void font_destroy( font_t * font );
+int font_string_width( font_t * font, const char * str );
 
 font_charinfo_t * font_get_character( font_t * font, font_char_t c );
 

@@ -5,25 +5,22 @@
 #include "http.h"
 
 #define PRECACHE_TIMEOUT_MS 3000
-
-#define PRECACHE_URL "http://localhost/precache/mp"
+#define PRECACHE_URL "http://192.168.0.100/precache/mp"
 #define PRECACHE_WINDOW_TITLE "Precache Test"
-
-// define as > 0 to test rendering
-// define as 0 for normal operations
-#define PRECACHE_TEST 0
-
-
-#define KB_DIV 1024
-#define MB_DIV 1048576
-
 #define PRECACHE_TEMP_BUFFER_SIZE 512
 #define PRECACHE_STATE_DOWNLOAD_REQUEST 1 // request to download a file
 #define PRECACHE_STATE_DOWNLOAD 2 // downloading a file
 #define PRECACHE_STATE_EXIT 3
 #define PRECACHE_STATE_ERROR 4
+#define PRECACHE_USER_AGENT "precache-downloader"
+
+#define KB_DIV 1024
+#define MB_DIV 1048576
 
 
+// define as > 0 to test rendering
+// define as 0 for normal operations
+#define PRECACHE_TEST 0
 
 
 #if _WIN32
@@ -127,7 +124,7 @@ typedef struct precache_thread_data_s
 
 typedef char md5_digest_t[ 33 ];
 
-void md5_from_path( const char * filename, char * digest );
 
+void md5_from_path( const char * filename, char * digest );
 int precache_parse_list( precache_state_t * precache );
 precache_file_t * precache_locate_next_file( precache_file_t * start );

@@ -25,6 +25,8 @@
     #endif
 #endif
 
+#define FONT_CALCULATE_ADVANCE( cinfo ) ((-cinfo->left + cinfo->advanceX)+1)
+
 void font_create( font_t * font )
 {
 }
@@ -170,7 +172,8 @@ void font_draw( font_t * font, int x, int y, const char * str, unsigned char r, 
         glTexCoord2f(c->uv[0], c->uv[1]);
         glVertex3f( xoffset+penX, penY + yoffset, zdepth );
 #endif
-        penX += (-c->left + c->advanceX) + 1;
+        //penX += (-c->left + c->advanceX) + 1;
+		penX += FONT_CALCULATE_ADVANCE(c);
     }
 
 #if USEGL
@@ -183,16 +186,34 @@ void font_draw( font_t * font, int x, int y, const char * str, unsigned char r, 
 
 void font_destroy( font_t * font )
 {
-    // delete the texture's pixels
-
     // delete texture (OpenGL)
+	glDeleteTextures( 1, &font->textureID );
 }
 
 font_charinfo_t * font_get_character( font_t * font, font_char_t c )
 {
     return &font->char_info[ (c-32) ];
-}
+} // font_get_character
 
+int font_string_width( font_t * font, const char * str )
+{
+	int width;
+	int i;
+	int string_len;
+	font_charinfo_t * charinfo;
+
+	string_len = strlen(str);
+
+
+	width = 0;
+	for( i = 0; i < string_len; ++i )
+	{
+		charinfo = &font->char_info[ (str[i-32]) ];
+		width += FONT_CALCULATE_ADVANCE(charinfo);
+	}
+
+	return width;
+}
 
 
 

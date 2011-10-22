@@ -5,10 +5,21 @@
 	#include <winsock2.h>
 	// windows.h must not be included before winsock2.h
 	#include <windows.h>
+	#include <gl/gl.h>
+	#pragma comment( lib, "opengl32.lib" )
+#elif __APPLE__
+	#include <sys/stat.h> // for mkdir
+	#include <OpenGL/OpenGL.h>
+#elif LINUX
+	#include <errno.h>
+	#include <sys/types.h>
+	#include <unistd.h>
+	#include <GL/gl.h>
+	#include <GL/glx.h>
 #endif
 
-#include <xwl/xwl.h>
 
+#include <xwl/xwl.h>
 #include <thread.h>
 #include "font.h"
 #include "log.h"
@@ -17,82 +28,61 @@
 #include "precachelib.h"
 #include "precache.h"
 
-
-
-#if __APPLE__
-	#include <sys/stat.h> // for mkdir
-#endif
-
-#if LINUX
-	#include <errno.h>
-	#include <sys/types.h>
-	#include <unistd.h>
-#endif
-
-
-
-
-
-
-
-
-
-
-
-int running = 1;
-
-i32 mx;
-i32 my;
-xwl_windowparams_t p;
-timevalue_t timestate;
-
 typedef struct
 {
 	font_t font;
+	timevalue_t ts;
+	mutex_t dl;
+	xwl_event_t event;
+	short running;
+	short width;
+	short height;
+	thread_t t0;
+	precache_thread_data_t tdata;
+	precache_state_t ps;
+	http_download_state_t downloadState;
+
+	// rendering related
+	button bar;
+	button closeButton;
+	short progressBarWidth;
+	float downloadPercent;
+	i32 mx;
+	i32 my;
+
+	// messages
+	char msg[ 256 ];
+	char msg2[ 256 ];
+	unsigned char msg_color[4];
+	int textpos[ 4 ];
 } application_state_t;
 application_state_t state;
 
-// temporary OpenGL tests
-#if _WIN32
-#include <windows.h>
-#include <gl/gl.h>
-#pragma comment( lib, "opengl32.lib" )
-#elif LINUX
-#include <GL/gl.h>
-#include <GL/glx.h>
-#elif __APPLE__
-#include <OpenGL/OpenGL.h>
-#endif
+void set_msg_color( u8 r, u8 g, u8 b, u8 a )
+{
+	state.msg_color[0] = r;
+	state.msg_color[1] = g;
+	state.msg_color[2] = b;
+	state.msg_color[3] = a;
+}
 
 
-#define XWL_DEBUG 0
-
-#if XWL_DEBUG
-#define xwlPrintf printf
-#else
-#define xwlPrintf //
-#endif
-
-
-
-button b;
-button bar;
 
 void cmd_quit( button * src )
 {
-	running = 0;
+	state.running = 0;
 }
 
 i32 mouse_inside_button( button * b )
 {
-	if ( mx > (b->x+b->width) )
+	if ( state.mx > (b->x+b->width) )
 		return 0;
-	if ( mx < b->x )
+	if ( state.mx < b->x )
 		return 0;
 
-	if ( my > (b->y + b->height) )
+	if ( state.my > (b->y + b->height) )
 		return 0;
-	if ( my < b->y )
+	if ( state.my < b->y )
 		return 0;
 	return 1;
 }
@@ -125,11 +115,11 @@ void callback( xwl_event_t * e )
 		xwlPrintf( "\t-> button: %s\n", xwl_mouse_to_string(e->button) );
 		if ( e->type == XWLE_MOUSEBUTTON_RELEASED && e->button == XWLMB_LEFT )
 		{
-			if ( mouse_inside_button( &b ) )
+			if ( mouse_inside_button( &state.closeButton ) )
 			{
-				if ( b.event )
+				if ( state.closeButton.event )
 				{
-					b.event( &b );
+					state.closeButton.event( &state.closeButton );
 				}
 			}
 		}
@@ -137,25 +127,27 @@ void callback( xwl_event_t * e )
 	else if ( e->type == XWLE_MOUSEMOVE )
 	{
 		xwlPrintf( "\t-> pos: (%i, %i)\n", e->mx, e->my );
-		mx = e->mx;
-		my = e->my;
+		state.mx = e->mx;
+		state.my = e->my;
 	}
 	else if ( e->type == XWLE_SIZE )
 	{
-		p.width = e->width;
-		p.height = e->height;
-		xwlPrintf( "\t-> width: %i\n", p.width );
-		xwlPrintf( "\t-> height: %i\n", p.height );
+		state.width = e->width;
+		state.height = e->height;
+		xwlPrintf( "\t-> width: %i\n", state.width );
+		xwlPrintf( "\t-> height: %i\n", state.height );
 	}
 	else if ( e->type == XWLE_CLOSED )
 	{
 		xwlPrintf( "Closed the window\n" );
-		running = 0;
+		state.running = 0;
 	}
 
 
 	if ( e->type == XWLE_KEYRELEASED && e->key == XWLK_ESCAPE )
-		running = 0;
+	{
+		state.running = 0;
+	}
 }
 
 void render_button( button * b )
@@ -191,7 +183,6 @@ void render_button_frame( button * b, int width, int height )
 	glEnd();
 }
 
-mutex_t dl;
 
 static g_thread_id = 0;
 
@@ -206,20 +197,21 @@ THREAD_ENTRY precache_download_thread( void * data )
 	int thread_id;
 	int last_bytes;
 	float last_read;
+
     if ( !td || !download || !precache )
         return 0;
 
 	last_bytes = 0;
-	last_read = timer_ms(&timestate);
+	last_read = timer_ms(&state.ts);
 	memset( download, 0, sizeof(http_download_state_t) );
 
 	thread_id = g_thread_id;
-	log_msg( "-> T: Entering Thread (%i)...\n", g_thread_id );
+	THREAD_MSG( "-> T: Entering Thread (%i)...\n", g_thread_id );
 	g_thread_id++;
 
 	while( td->state != PRECACHE_STATE_EXIT && td->state != PRECACHE_STATE_ERROR )
 	{
-	    mutex_lock( &dl );
+	    mutex_lock( &state.dl );
 		//log_msg( "* T: Think\n" );
 
 	    if ( td->state == PRECACHE_STATE_DOWNLOAD )
@@ -229,15 +221,16 @@ THREAD_ENTRY precache_download_thread( void * data )
 			if ( download->bytes_read != last_bytes )
 			{
 				last_bytes = download->bytes_read;
-				last_read = timer_ms(&timestate);
+				last_read = timer_ms(&state.ts);
+				//log_msg( "-> T: %i - total=%i bytes at last_read=%g\n", thread_id, last_bytes, last_read );
 			}
 			else
 			{
 				// if we haven't read any more bytes, see how long it's been since we last read bytes
-				dt = (timer_ms(&timestate) - last_read);
+				dt = (timer_ms(&state.ts) - last_read);
 				if ( dt > PRECACHE_TIMEOUT_MS )
 				{
-					log_msg( "-> T: %i - Download of file \"%s\" timed out!\n", thread_id, remotepath );
+					THREAD_MSG( "-> T: %i - Download of file \"%s\" timed out (%g)!\n", thread_id, remotepath, timer_ms(&state.ts) );
 					//td->precache->state = PS_DOWNLOAD_TIMEDOUT;
 					td->state = PRECACHE_STATE_EXIT;
 					td->download->error = 1;
@@ -245,13 +238,12 @@ THREAD_ENTRY precache_download_thread( void * data )
 					strcpy( precache->err2, remotepath );
 				}
 			}
-
 	    }
         else if ( td->state == PRECACHE_STATE_DOWNLOAD_REQUEST )
         {
 			if ( precache->curfile )
 			{
-				precache->curfile->timestamp = timer_ms(&timestate);
+				precache->curfile->timestamp = timer_ms(&state.ts);
 
 				// construct remote path
 				memset( remotepath, 0, PRECACHE_TEMP_BUFFER_SIZE );
@@ -264,9 +256,9 @@ THREAD_ENTRY precache_download_thread( void * data )
 				strcat( localpath, precache->curfile->targetpath );
 				platform_conform_slashes( localpath, PRECACHE_TEMP_BUFFER_SIZE );
 
-				log_msg( "-> T: %i - Requesting a new file [remotepath=%s, localpath=%s]\n", thread_id, remotepath, localpath );
+				THREAD_MSG( "-> T: %i - Requesting a new file [remotepath=%s, localpath=%s]\n", thread_id, remotepath, localpath );
 
-				http_download_file( remotepath, localpath, download );
+				http_download_file( remotepath, localpath, PRECACHE_USER_AGENT, download );
 				td->state = PRECACHE_STATE_DOWNLOAD;
 			}
         }
@@ -277,11 +269,11 @@ THREAD_ENTRY precache_download_thread( void * data )
 			{
 				if ( download->completed )
 				{
-					log_msg( "-> T: %i - download complete!\n", thread_id );
+					THREAD_MSG( "-> T: %i - download complete!\n", thread_id );
 				}
 				else
 				{
-					log_msg( "-> T: %i - Unable to download file: %s\n", thread_id, remotepath );
+					THREAD_MSG( "-> T: %i - Unable to download file: %s\n", thread_id, remotepath );
 					strcpy( precache->err1, "Update failed! File not found:" );
 					strcpy( precache->err2, remotepath );
 				}
@@ -289,11 +281,10 @@ THREAD_ENTRY precache_download_thread( void * data )
 			}
 		}
 
-        mutex_unlock( &dl );
-
+        mutex_unlock( &state.dl );
 	}
 
-	log_msg( "-> T: %i - Leaving Thread.\n", thread_id );
+	THREAD_MSG( "-> T: %i - Leaving Thread.\n", thread_id );
 
     return 0;
 }
@@ -325,7 +316,7 @@ THREAD_ENTRY precache_calculate_checksums( void * data )
 			{
 				memset( localpath, 0, 256 );
 				strcpy( localpath, precache->localpath );
-				strcat( localpath, file->path );
+				strcat( localpath, file->targetpath );
 
 				//log_msg( "* MD5 Calculate checksum for file \"%s\"\n", file->path );
 
@@ -354,6 +345,254 @@ THREAD_ENTRY precache_calculate_checksums( void * data )
 } // precache_calculate_checksums
 
 
+void process_downloads()
+{
+	mutex_lock( &state.dl );
+	if ( state.ps.state == PS_DOWNLOAD_LIST && state.downloadState.completed )
+	{
+		if ( state.downloadState.completed )
+		{
+			state.bar.color[0] = 16;
+			state.bar.color[1] = 128;
+			state.bar.color[2] = 16;
+
+			state.downloadState.completed = 0;
+			state.downloadPercent = 1;
+			log_msg( "* Finished downloading precache.list\n" );
+			state.ps.state = PS_PARSING_LIST;
+			state.ps.curfile->flags = 1; // downloaded
+
+            // analyze the precache list and update the file list
+            if ( precache_parse_list( &state.ps ) )
+            {
+				// cat the base path onto the binary directory...
+				strcat( state.ps.localpath, state.ps.base );
+
+                // ensure this directory exists..
+#if 0
+#if LINUX || __APPLE__
+                // http://pubs.opengroup.org/onlinepubs/009695399/functions/mkdir.html
+                mkdir( state.ps.localpath, (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH ) );
+#else
+				platform_conform_slashes( state.ps.localpath, MAX_PATH_SIZE );
+				created_directory = CreateDirectoryA( state.ps.localpath, 0 );
+
+				if ( !created_directory )
+				{
+					log_msg( "* CreateDirectory FAILED: [%s]\n", state.ps.localpath );
+				}
+
+				
+#endif
+#endif
+				platform_makedirs( state.ps.localpath );
+
+				strcpy( state.msg, "Calculating MD5 checksums..." );
+				strcpy( state.msg2, "(this may take a while)" );
+
+				THREAD_MSG( "* THREAD: Initiating thread calculate checksums.\n" );
+
+				// fire up a task thread to determine what needs to be downloaded...
+				state.ps.state = PS_CALCULATING_CHECKSUMS;
+				thread_stop( &state.t0 );
+				thread_start( &state.t0, precache_calculate_checksums, &state.tdata );
+				
+            }
+            else
+            {
+                log_msg( "Error parsing the precache.list file.\n" );
+                // precache list error
+				state.ps.state = PS_PARSE_ERROR;
+
+                strcpy( state.msg, state.ps.err1 );
+                strcpy( state.msg2, state.ps.err2 );
+				set_msg_color( 255, 0, 0, 255 );
+            }
+		}
+		else
+		{
+			if (state.downloadState.bytes_read > 0)
+			{
+				state.downloadPercent = (state.downloadState.bytes_read/(float)state.downloadState.content_length);
+			}
+			else if ( state.downloadState.bytes_read == 0 )
+			{
+				state.downloadPercent = 0;
+			}
+			else
+			{
+				log_msg( "Error occurred while downloading. bytes_read is < 0!\n" );
+			}
+			sprintf( state.msg, "Downloading \"%s\"", state.ps.curfile->path );
+			sprintf( state.msg2, "Progress: (%iKB/%iKB)", state.downloadState.bytes_read/KB_DIV, state.downloadState.content_length/KB_DIV );
+			set_msg_color( 255, 255, 255, 255 );
+		}
+	}
+	else if ( state.ps.state == PS_FINISHED_PARSING_LIST )
+	{
+		log_msg( "* finished parsing precache.list, beginning downloads\n" );
+
+		state.ps.curfile = state.ps.files;
+		// finished analysis, resume normal downloading state
+		state.ps.state = PS_DOWNLOAD_NEXT;
+	}
+	else if ( state.ps.state == PS_DOWNLOAD_NEXT )
+	{
+		state.ps.curfile = precache_locate_next_file( state.ps.curfile );
+
+		if ( !state.ps.curfile )
+		{
+			strcpy( state.msg, "All files up to date." );
+			strcpy( state.msg2, "" );
+			set_msg_color( 0, 255, 0, 255 );
+			state.running = 0;
+		}
+		else
+		{
+			state.ps.state = PS_DOWNLOADING;
+			// initiate download
+			thread_stop( &state.t0 );
+			state.tdata.state = PRECACHE_STATE_DOWNLOAD_REQUEST;
+
+			THREAD_MSG( "* THREAD: Initiating download thread to fetch (%s)\n", state.ps.curfile->path );
+			thread_start( &state.t0, precache_download_thread, &state.tdata );
+		}
+	}
+	else if ( state.ps.state == PS_DOWNLOADING )
+	{
+		if (state.downloadState.bytes_read > 0)
+		{
+			state.downloadPercent = (state.downloadState.bytes_read/(float)state.downloadState.content_length);
+		}
+		else if ( state.downloadState.bytes_read == 0 )
+		{
+			state.downloadPercent = 0;
+		}
+		else
+		{
+			log_msg( "Error occurred while downloading. bytes_read is < 0!\n" );
+		}
+		sprintf( state.msg, "Downloading \"%s\"", state.ps.curfile->path );
+		sprintf( state.msg2, "Progress: (%iKB/%iKB)", state.downloadState.bytes_read/KB_DIV, state.downloadState.content_length/KB_DIV );
+		set_msg_color( 255, 255, 255, 255 );
+
+		if ( state.downloadState.completed )
+		{
+			state.bar.color[0] = 16;
+			state.bar.color[1] = 128;
+			state.bar.color[2] = 16;
+
+			state.downloadState.completed = 0;
+			log_msg( "\tDownloading \"%s\" -> success! (%i/%i)\n", state.ps.curfile->path, state.downloadState.bytes_read, state.downloadState.content_length );
+			state.ps.curfile->flags = 1;
+			state.ps.state = PS_DOWNLOAD_NEXT;
+		}
+		else
+		{
+			state.bar.color[0] = 0;
+			state.bar.color[1] = 255;
+			state.bar.color[2] = 0;
+		}
+	}
+
+	if ( state.ps.state == PS_DOWNLOAD_LIST || state.ps.state == PS_DOWNLOADING )
+	{
+		if ( state.downloadState.error )
+		{
+			if ( state.ps.state == PS_DOWNLOAD_LIST )
+			{
+				// unable to download precache.list
+				strcpy( state.msg, "Error downloading precache.list from:" );
+				strcpy( state.msg2, state.ps.remotepath );
+				strcat( state.msg2, "/precache.list" );
+				set_msg_color( 255, 0, 0, 255 );
+			}
+			else if ( state.ps.state == PS_DOWNLOADING )
+			{
+				strcpy( state.msg, state.ps.err1 );
+				strcpy( state.msg2, state.ps.err2 );
+				set_msg_color( 255, 0, 0, 255 );
+
+				if ( state.ps.curfile )
+				{
+					strcpy( state.ps.currentfilepath, state.ps.localpath );
+					strcat( state.ps.currentfilepath, state.ps.curfile->path );
+					unlink( state.ps.currentfilepath );
+				}
+			}
+
+			log_msg( "An error occurred! Messages: [%s] [%s] | state: %i\n", state.msg, state.msg2, state.ps.state );
+			state.ps.state = PS_DOWNLOAD_ERROR;
+		}
+
+	}
+
+	mutex_unlock( &state.dl );
+}
+
+
+void tick()
+{
+    xwl_pollevent( &state.event );
+
+	glClearColor(0.25, 0.25, 0.25, 1.0);
+	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+	glViewport( 0, 0, state.width, state.height );
+
+	glMatrixMode( GL_PROJECTION );
+	glLoadIdentity();
+
+	glOrtho( 0, state.width, state.height, 0, -.1f, 256.0f );
+
+	glMatrixMode( GL_MODELVIEW );
+	glLoadIdentity();
+
+	render_button( &state.closeButton );
+	render_button( &state.bar );
+	render_button_frame( &state.bar, state.progressBarWidth, state.bar.height );
+
+	if ( mouse_inside_button( &state.closeButton ) )
+	{
+		state.closeButton.color[0] = 0;
+		state.closeButton.color[1] = 192;
+		state.closeButton.color[2] = 192;
+	}
+	else
+	{
+		state.closeButton.color[0] = 0;
+		state.closeButton.color[1] = 128;
+		state.closeButton.color[2] = 128;
+	}
+
+
+	state.bar.width = (i16)(state.downloadPercent * state.progressBarWidth);
+
+	// draw black text to act as a drop-shadow
+	font_draw( &state.font, state.textpos[0]+2, state.textpos[1]+2, state.msg, 0, 0, 0, 255 );
+	if ( state.msg2[0] != 0 )
+	{
+		font_draw( &state.font, state.textpos[2]+2, state.textpos[3]+2, state.msg2, 0, 0, 0, 255 );
+	}
+
+	// draw foreground text
+    font_draw( &state.font, state.textpos[0], state.textpos[1], state.msg, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
+	if ( state.msg2[0] != 0 )
+	{
+		font_draw( &state.font, state.textpos[2], state.textpos[3], state.msg2, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
+	}
+
+	// render button text
+	font_draw( &state.font, 388, 114, "Close", 255, 255, 255, 255 );
+
+    // do a swap of buffers
+	xwl_finish();
+
+#if !PRECACHE_TEST
+	// runs logic of processing downloads
+	process_downloads();
+#endif
+}
+
 
 
 
@@ -365,80 +604,73 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 #endif
 {
     xwl_window_t * window = 0;
-    xwl_event_t event;
-    http_download_state_t downloadState;
-	u32 progressWidth = 400;
-	float pct = 0;
-	thread_t t0;
-    precache_state_t ps;
-    precache_thread_data_t tdata;
+	xwl_windowparams_t p;
 	precache_file_t * file;
-	char log_path[ 255 ];
-	char msg[ 256 ];
-	char msg2[ 256 ];
-	unsigned char msg_color[4];
-	int created_directory;
+	char log_path[ MAX_PATH_SIZE ];
 
 
-	int textpos[ 4 ];
+	timer_startup(&state.ts);
 
-	timer_startup(&timestate);
+	state.running = 1;
 
     /* setup button */
-	b.event = cmd_quit;
-	b.width = 70;
-	b.height = 25;
-	b.x = 365;
-	b.y = 95;
-	b.color[0] = 0;
-	b.color[1] = 128;
-	b.color[2] = 128;
+	state.closeButton.event = cmd_quit;
+	state.closeButton.width = 70;
+	state.closeButton.height = 25;
+	state.closeButton.x = 365;
+	state.closeButton.y = 95;
+	state.closeButton.color[0] = 0;
+	state.closeButton.color[1] = 128;
+	state.closeButton.color[2] = 128;
 
 	// setup progress bar
-	bar.event = 0;
-	bar.x = 25;
-	bar.y = 60;
-	bar.height = 15;
-	bar.width = 1;
-	bar.color[0] = 255;
-	bar.color[1] = 0;
-	bar.color[2] = 255;
+	state.bar.event = 0;
+	state.bar.x = 25;
+	state.bar.y = 60;
+	state.bar.height = 15;
+	state.bar.width = 1;
+	state.bar.color[0] = 255;
+	state.bar.color[1] = 0;
+	state.bar.color[2] = 255;
 
 	// setup text position
-	textpos[0] = 30;
-	textpos[1] = 25;
-	textpos[2] = 30;
-	textpos[3] = 45;
+	state.textpos[0] = 30;
+	state.textpos[1] = 25;
+	state.textpos[2] = 30;
+	state.textpos[3] = 45;
 
-	memset(&downloadState, 0, sizeof(http_download_state_t));
-    tdata.download = &downloadState;
-    tdata.precache = &ps;
-    tdata.state = PRECACHE_STATE_DOWNLOAD_REQUEST;
+	state.progressBarWidth = 400;
+	state.downloadPercent = 0;
 
-    memset( &ps, 0, sizeof(precache_state_t) );
+	memset(&state.downloadState, 0, sizeof(http_download_state_t));
+    state.tdata.download = &state.downloadState;
+    state.tdata.precache = &state.ps;
+    state.tdata.state = PRECACHE_STATE_DOWNLOAD_REQUEST;
+
+    memset( &state.ps, 0, sizeof(precache_state_t) );
 
     // add the first file - which is the precache.list
-    ps.curfile = (precache_file_t*)malloc( sizeof(precache_file_t) );
-    ps.curfile->next = 0;
-    memset( ps.curfile->checksum, 0, 33 );
-    ps.curfile->flags = 0;
-    memset( ps.curfile->path, 0, MAX_PATH_SIZE );
-    strcpy( ps.curfile->path, "/precache.list" );
-	strcpy( ps.curfile->targetpath, ps.curfile->path );
-    ps.files = ps.curfile;
-    ps.state = 0; // download precache.list mode.
+    state.ps.curfile = (precache_file_t*)malloc( sizeof(precache_file_t) );
+    state.ps.curfile->next = 0;
+    memset( state.ps.curfile->checksum, 0, 33 );
+    state.ps.curfile->flags = 0;
+    memset( state.ps.curfile->path, 0, MAX_PATH_SIZE );
+    strcpy( state.ps.curfile->path, "/precache.list" );
+	strcpy( state.ps.curfile->targetpath, state.ps.curfile->path );
+    state.ps.files = state.ps.curfile;
+    state.ps.state = 0; // download precache.list mode.
 
     // setup configure the paths
-    memset( ps.remotepath, 0, MAX_PATH_SIZE );
-	memset( ps.localpath, 0, MAX_PATH_SIZE );
+    memset( state.ps.remotepath, 0, MAX_PATH_SIZE );
+	memset( state.ps.localpath, 0, MAX_PATH_SIZE );
 
     // the directory which contains the precache.list
-	strcpy( ps.remotepath, PRECACHE_URL );
+	strcpy( state.ps.remotepath, PRECACHE_URL );
 
-	platform_operating_directory( ps.localpath, MAX_PATH_SIZE );
+	platform_operating_directory( state.ps.localpath, MAX_PATH_SIZE );
 
-	memset( log_path, 0, 255 );
-	strcpy( log_path, ps.localpath );
+	memset( log_path, 0, MAX_PATH_SIZE );
+	strcpy( log_path, state.ps.localpath );
 	strcat( log_path, "/" );
 	strcat( log_path, "precache.log" );
 
@@ -451,18 +683,18 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 // So we are going to strip three directories from that path to get the perceived location...
 #if __APPLE__
 	{
-		char * p = strrchr( ps.localpath, PATH_SEPARATOR );
+		char * p = strrchr( state.ps.localpath, PATH_SEPARATOR );
 
 		if ( p )
 		{
 			*p = '\0';
 
-			p = strrchr(ps.localpath, PATH_SEPARATOR);
+			p = strrchr(state.ps.localpath, PATH_SEPARATOR);
 			if ( p ) // found it again...
 			{
 				*p = '\0';
 
-				p = strrchr(ps.localpath, PATH_SEPARATOR);
+				p = strrchr(state.ps.localpath, PATH_SEPARATOR);
 				if ( p )
 				{
 					*p = '\0';
@@ -472,15 +704,15 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	}
 #endif
 
-	printf( "LocalPath: %s\n", ps.localpath );
+	printf( "LocalPath: %s\n", state.ps.localpath );
 
-    strcpy( ps.precache_file, ps.localpath );
-	strcat( ps.precache_file, "/precache.list" );
+    strcpy( state.ps.precache_file, state.ps.localpath );
+	strcat( state.ps.precache_file, "/precache.list" );
 
-    if ( ps.files )
+    if ( state.ps.files )
     {
         printf( "Dumping files on startup----------------------\n" );
-        file = ps.files;
+        file = state.ps.files;
 
         while( file )
         {
@@ -497,7 +729,6 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     net_startup();
     xwl_startup();
 
-
     window = xwl_create_window( &p, PRECACHE_WINDOW_TITLE, 0 );
 
     if ( !window )
@@ -506,299 +737,50 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
         exit(1);
     }
 
+	state.width = p.width;
+	state.height = p.height;
     xwl_set_callback( callback );
 
     // init font
     //font_load_embedded( &state.font, font_liberation_mono8, font_liberation_mono8_size );
     font_load_embedded( &state.font, font_pf_tempesta_seven8, font_pf_tempesta_seven8_size );
 
-	memset( msg, 0, 256 );
-	memset( msg2, 0, 256 );
-	msg_color[0] = msg_color[1] = msg_color[2] = msg_color[3] = 255;
-
+	memset( state.msg, 0, 256 );
+	memset( state.msg2, 0, 256 );
+	set_msg_color( 255, 255, 255, 255 );
 
 #if PRECACHE_TEST
-
-
+	strcpy( state.msg, "Testing message one string..." );
+	strcpy( state.msg2, "Testing message two string..." );
 #else
-
-	strcpy( msg, "Downloading precache.list..." );
-	log_msg( "* MSG: %s\n", msg );
-
-    // start thread here
-	mutex_create( &dl );
-
-	log_msg( "* THREAD: Initiating download thread to fetch precache.list\n" );
-
-	ps.state = PS_DOWNLOAD_LIST;
-
+	strcpy( state.msg, "Downloading precache.list..." );
+	mutex_create( &state.dl );
+	THREAD_MSG( "* THREAD: Initiating download thread to fetch precache.list\n" );
+	state.ps.state = PS_DOWNLOAD_LIST;
     // start the download thread - this will attempt to grab the precache.list file
-    thread_start( &t0, precache_download_thread, &tdata );
-
-    memset( &event, 0, sizeof(xwl_event_t) );
-    while( running )
-    {
-        xwl_pollevent( &event );
-
-		glClearColor(0.25, 0.25, 0.25, 1.0);
-		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-		glViewport( 0, 0, p.width, p.height );
-
-		glMatrixMode( GL_PROJECTION );
-		glLoadIdentity();
-
-		glOrtho( 0, p.width, p.height, 0, -.1f, 256.0f );
-
-		glMatrixMode( GL_MODELVIEW );
-		glLoadIdentity();
-
-		render_button( &b );
-		render_button( &bar );
-
-		render_button_frame( &bar, progressWidth, bar.height );
-
-		if ( mouse_inside_button( &b ) )
-		{
-			b.color[0] = 0;
-			b.color[1] = 192;
-			b.color[2] = 192;
-		}
-		else
-		{
-			b.color[0] = 0;
-			b.color[1] = 128;
-			b.color[2] = 128;
-		}
-
-		bar.width = (i16)(pct * progressWidth);
-
-        // draw test font string
-
-		// draw black text to act as a drop-shadow
-		font_draw( &state.font, textpos[0]+2, textpos[1]+2, msg, 0, 0, 0, 255 );
-		if ( msg2[0] != 0 )
-		{
-			font_draw( &state.font, textpos[2]+2, textpos[3]+2, msg2, 0, 0, 0, 255 );
-		}
-
-		// draw foreground text
-        font_draw( &state.font, textpos[0], textpos[1], msg, msg_color[0], msg_color[1], msg_color[2], msg_color[3] );
-		if ( msg2[0] != 0 )
-		{
-			font_draw( &state.font, textpos[2], textpos[3], msg2, msg_color[0], msg_color[1], msg_color[2], msg_color[3] );
-		}
-
-		// render button text
-		font_draw( &state.font, 380, 114, "Close", 255, 255, 255, 255 );
-
-
-        // do a swap of buffers
-		xwl_finish();
-
-
-		mutex_lock(&dl);
-		if ( ps.state == PS_DOWNLOAD_LIST && downloadState.completed )
-		{
-			if ( downloadState.completed )
-			{
-				bar.color[0] = 16;
-				bar.color[1] = 128;
-				bar.color[2] = 16;
-
-				downloadState.completed = 0;
-				pct = 1;
-				log_msg( "Finished downloading precache.list\n" );
-				ps.state = PS_PARSING_LIST;
-				ps.curfile->flags = 1; // downloaded
-
-                // analyze the precache list and update the file list
-                if ( precache_parse_list( &ps ) )
-                {
-					// cat the base path onto the binary directory...
-					strcat( ps.localpath, ps.base );
-
-                    // ensure this directory exists..
-#if LINUX || __APPLE__
-                    // http://pubs.opengroup.org/onlinepubs/009695399/functions/mkdir.html
-                    mkdir( ps.localpath, (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH ) );
-#else
-					created_directory = CreateDirectoryA( ps.localpath, 0 );
-
-					if ( !created_directory )
-					{
-						log_msg( "* CreateDirectory FAILED: [%s]\n", ps.localpath );
-					}
+    thread_start( &state.t0, precache_download_thread, &state.tdata );
 #endif
 
-					strcpy( msg, "Calculating MD5 checksums..." );
-					strcpy( msg2, "(this may take a while)" );
-
-					log_msg( "* THREAD: Initiating thread calculate checksums.\n" );
-
-					ps.state = PS_CALCULATING_CHECKSUMS;
-
-					// fire up a task thread to determine what needs to be downloaded...
-					thread_stop( &t0 );
-					thread_start( &t0, precache_calculate_checksums, &tdata );
-                }
-                else
-                {
-                    log_msg( "Error parsing the precache.list file.\n" );
-                    // precache list error
-					ps.state = PS_PARSE_ERROR;
-
-                    strcpy( msg, ps.err1 );
-                    strcpy( msg2, ps.err2 );
-                    msg_color[0] = 255;
-                    msg_color[1] = 0;
-                    msg_color[2] = 0;
-                    msg_color[3] = 255;
-                }
-			}
-			else
-			{
-				if (downloadState.bytes_read > 0)
-				{
-					pct = (downloadState.bytes_read/(float)downloadState.content_length);
-				}
-				else if ( downloadState.bytes_read == 0 )
-				{
-					pct = 0;
-				}
-				else
-				{
-					log_msg( "Error occurred while downloading. bytes_read is < 0!\n" );
-				}
-				sprintf( msg, "Downloading \"%s\"", ps.curfile->path );
-				sprintf( msg2, "Progress: (%iKB/%iKB)", downloadState.bytes_read/KB_DIV, downloadState.content_length/KB_DIV );
-				msg_color[0] = msg_color[1] = msg_color[2] = 255;
-				msg_color[3] = 255;
-			}
-		}
-		else if ( ps.state == PS_FINISHED_PARSING_LIST )
-		{
-			log_msg( "* finished parsing precache.list, beginning downloads\n" );
-
-			ps.curfile = ps.files;
-			// finished analysis, resume normal downloading state
-			ps.state = PS_DOWNLOAD_NEXT;
-		}
-		else if ( ps.state == PS_DOWNLOAD_NEXT )
-		{
-			ps.curfile = precache_locate_next_file( ps.curfile );
-
-			if ( !ps.curfile )
-			{
-				strcpy( msg, "All files up to date." );
-				strcpy( msg2, "" );
-				msg_color[0] = 0;
-				msg_color[1] = 255;
-				msg_color[2] = 0;
-				msg_color[3] = 255;
-				running = 0;
-			}
-			else
-			{
-				ps.state = PS_DOWNLOADING;
-				// initiate download
-				thread_stop( &t0 );
-				tdata.state = PRECACHE_STATE_DOWNLOAD_REQUEST;
-
-				log_msg( "* THREAD: Initiating download thread to fetch (%s)\n", ps.curfile->path );
-				thread_start( &t0, precache_download_thread, &tdata );
-			}
-		}
-		else if ( ps.state == PS_DOWNLOADING )
-		{
-			if (downloadState.bytes_read > 0)
-			{
-				pct = (downloadState.bytes_read/(float)downloadState.content_length);
-			}
-			else if ( downloadState.bytes_read == 0 )
-			{
-				pct = 0;
-			}
-			else
-			{
-				log_msg( "Error occurred while downloading. bytes_read is < 0!\n" );
-			}
-			sprintf( msg, "Downloading \"%s\"", ps.curfile->path );
-			sprintf( msg2, "Progress: (%iKB/%iKB)", downloadState.bytes_read/KB_DIV, downloadState.content_length/KB_DIV );
-			msg_color[0] = msg_color[1] = msg_color[2] = 255;
-			msg_color[3] = 255;
-
-			if ( downloadState.completed )
-			{
-				bar.color[0] = 16;
-				bar.color[1] = 128;
-				bar.color[2] = 16;
-
-				downloadState.completed = 0;
-				log_msg( "\t-> File (%s) downloaded successfully (%i/%i)\n", ps.curfile->path, downloadState.bytes_read, downloadState.content_length );
-				ps.curfile->flags = 1;
-				ps.state = PS_DOWNLOAD_NEXT;
-			}
-			else
-			{
-				bar.color[0] = 0;
-				bar.color[1] = 255;
-				bar.color[2] = 0;
-			}
-		}
-
-		if ( ps.state == PS_DOWNLOAD_LIST || ps.state == PS_DOWNLOADING )
-		{
-			if ( downloadState.error )
-			{
-				if ( ps.state == PS_DOWNLOAD_LIST )
-				{
-					// unable to download precache.list
-					strcpy( msg, "Error downloading precache.list from:" );
-					strcpy( msg2, ps.remotepath );
-					strcat( msg2, "/precache.list" );
-					msg_color[0] = 255;
-					msg_color[1] = 0;
-					msg_color[2] = 0;
-					msg_color[3] = 255;
-				}
-				else if ( ps.state == PS_DOWNLOADING )
-				{
-					strcpy( msg, ps.err1 );
-					strcpy( msg2, ps.err2 );
-					msg_color[0] = 255;
-					msg_color[1] = 0;
-					msg_color[2] = 0;
-					msg_color[3] = 255;
-
-					if ( ps.curfile )
-					{
-						strcpy( ps.currentfilepath, ps.localpath );
-						strcat( ps.currentfilepath, ps.curfile->path );
-						unlink( ps.currentfilepath );
-					}
-				}
-
-				log_msg( "An error occurred! Messages: [%s] [%s] | state: %i\n", msg, msg2, ps.state );
-				ps.state = PS_DOWNLOAD_ERROR;
-			}
-
-		}
-
-		mutex_unlock( &dl );
+    memset( &state.event, 0, sizeof(xwl_event_t) );
+    while( state.running )
+    {
+		tick();
     }
 
+#if !PRECACHE_TEST
 	// kill t0, if running
-	if ( t0.state == THREAD_STATE_ACTIVE )
+	if ( state.t0.state == THREAD_STATE_ACTIVE )
 	{
-		thread_stop( &t0 );
+		thread_stop( &state.t0 );
 	}
+#endif
 
-	mutex_destroy( &dl );
+	mutex_destroy( &state.dl );
 
     // cleanup files
-    if ( ps.files )
+    if ( state.ps.files )
     {
-        precache_file_t * file = ps.files;
+        precache_file_t * file = state.ps.files;
         precache_file_t * temp;
 
         while( file )
@@ -809,15 +791,15 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
         }
     }
 
-	thread_stop( &t0 );
-
+	thread_stop( &state.t0 );
 
 	// cleanup the precache list from the filesystem...
-	unlink( ps.precache_file );
+	unlink( state.ps.precache_file );
 
-#endif
+	log_msg( "* Shutting down gracefully.\n" );
 
-	log_msg( "precache: shutting down gracefully.\n" );
+	// destroy font stuff
+	font_destroy( &state.font );
 
     // shutdown xwl and network
 	xwl_shutdown();

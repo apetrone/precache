@@ -64,7 +64,7 @@ void http_process_header( const char * line, int len, http_download_state_t * st
 	dprintf("\n");
 } // http_process_header
 
-void http_download_file( const char * url, const char * temporaryFilePath, http_download_state_t * state )
+void http_download_file( const char * url, const char * temporaryFilePath, const char * user_agent, http_download_state_t * state )
 {
     int err;
     int bytesSent;
@@ -132,7 +132,7 @@ void http_download_file( const char * url, const char * temporaryFilePath, http_
     }
 
     // send GET request to server
-    sprintf( GETrequest, "GET %s HTTP/1.1\r\nUser-Agent: Auto-Patch\r\nAccept: */*\r\nHost: %s\r\nConnection: close\r\n\r\n", filename, host );
+    sprintf( GETrequest, "GET %s HTTP/1.1\r\nUser-Agent: %s\r\nAccept: */*\r\nHost: %s\r\nConnection: close\r\n\r\n", filename, user_agent, host );
 
     dprintf( "* HTTP: <- %s\n", GETrequest );
     bytesSent = net_sock_send( state->socket, 0, GETrequest, strlen(GETrequest), 1 );

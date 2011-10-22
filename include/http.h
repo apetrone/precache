@@ -36,7 +36,7 @@ void http_process_header( const char * line, int len, http_download_state_t * st
 void http_download_write( http_download_state_t * state, const char * data, int dataSize );
 
 // initiate file download
-void http_download_file( const char * url, const char * temporaryFilePath, http_download_state_t * state );
+void http_download_file( const char * url, const char * temporaryFilePath, const char * user_agent, http_download_state_t * state );
 
 // tick file download - check for new data from stream
 void http_download_tick( http_download_state_t * state, int timeout_seconds );

@@ -26,6 +26,7 @@ Portions of SFML were used for the window code.
 KNOWN ISSUES
 
 XWLE_TEXT events on Linux only generate ASCII equivalent Unicode values.
+Lighttpd (1.4.10) on Windows sometimes sends the wrong-content length.
 
 BUILDING
 
@@ -43,6 +44,7 @@ I have tested the following project files under the respective OS.
 
 	Windows
 	premake4 vs2008
+	* You may need to clear the entry point from the visual studio project properties so it does not look for "mainCRTStartup"
 
 
 
