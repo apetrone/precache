@@ -1,5 +1,6 @@
 #include "precachelib.h"
-
+#include "platform.h"
+#include "log.h"
 
 static int print( void *ctx, int type, const JSON_value * value )
 {
@@ -39,6 +40,9 @@ static int print( void *ctx, int type, const JSON_value * value )
                 memset( file, 0, sizeof(precache_file_t) );
                 file->next = ps->state->files;
                 file->flags = 0;
+				file->platformid = -1;
+				memset( file->targetpath, 0, MAX_PATH_SIZE );
+				memset( file->path, 0, MAX_PATH_SIZE );
                 ps->state->files = file;
                 ps->state->curfile = file;
             }
@@ -66,20 +70,25 @@ static int print( void *ctx, int type, const JSON_value * value )
             }
             else if ( ps->flags & 2 )
             {
-                if ( stricmp( ps->lastkey, "path" ) == 0 )
-                {
-                    if( ps->state->curfile )
-                    {
-                        strncpy( ps->state->curfile->path, value->vu.str.value, 255 );
-                    }
-                }
-                else if ( stricmp( ps->lastkey, "md5" ) == 0 )
-                {
-                    if( ps->state->curfile )
-                    {
-                        strncpy( ps->state->curfile->checksum, value->vu.str.value, 32 );
-                    }
-                }
+				if ( ps->state->curfile )
+				{
+					if ( stricmp( ps->lastkey, "path" ) == 0 )
+					{
+						strncpy( ps->state->curfile->path, value->vu.str.value, MAX_PATH_SIZE-1 );
+					}
+					else if ( stricmp( ps->lastkey, "target" ) == 0 )
+					{
+						strncpy( ps->state->curfile->targetpath, value->vu.str.value, MAX_PATH_SIZE-1 );
+					}
+					else if ( stricmp( ps->lastkey, "md5" ) == 0 )
+					{
+						strncpy( ps->state->curfile->checksum, value->vu.str.value, 32 );
+					}
+					else if ( stricmp( ps->lastkey, "platform" ) == 0 )
+					{
+						ps->state->curfile->platformid = atoi( value->vu.str.value );
+					}
+				}
             }
             break;
     }
@@ -101,6 +110,7 @@ int precache_parse_list( precache_state_t * precache )
     char * buffer;
     int linenumber;
     int colnumber;
+	precache_file_t * file;
     precache_parse_state_t pstate;
 
     // construct absolute path to precache list...
@@ -182,6 +192,18 @@ int precache_parse_list( precache_state_t * precache )
         free( buffer );
     }
 
+
+	// go through each file and make sure targetpath has a valid path
+	file = precache->files;
+	while( file )
+	{
+		if ( file->targetpath[0] == 0 )
+			strcpy( file->targetpath, file->path );
+
+		file = file->next;
+	}
+
+
 	log_msg( "finished parsing precache.list. returning with result: %i\n", result );
     return result;
 }
@@ -196,8 +218,9 @@ precache_file_t * precache_locate_next_file( precache_file_t * start )
 	log_msg( "* LOC: start is [%s]\n", start->path );
 	do
 	{
-		// this file hasn't been downloaded...
-		if ( !(cur->flags & 1) )
+		// this file hasn't been downloaded... AND
+		// this file matches this is platform agnostic or matches platform ID
+		if ( !(cur->flags & 1) && (cur->platformid == -1 || (cur->platformid == PRECACHE_PLATFORM)) )
 		{
 			log_msg( "* LOC: file not downloaded: [%s]\n", cur->path );
 			next = cur;

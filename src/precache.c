@@ -1,4 +1,12 @@
 #include <stdio.h>
+
+#if _WIN32
+	#define WIN32_LEAN_AND_MEAN
+	#include <winsock2.h>
+	// windows.h must not be included before winsock2.h
+	#include <windows.h>
+#endif
+
 #include <xwl/xwl.h>
 
 #include <thread.h>
@@ -9,12 +17,7 @@
 #include "precachelib.h"
 #include "precache.h"
 
-#if _WIN32
-	#define WIN32_LEAN_AND_MEAN
-	#include <winsock2.h>
-	// windows.h must not be included before winsock2.h
-	#include <windows.h>
-#endif
+
 
 #if __APPLE__
 	#include <sys/stat.h> // for mkdir
@@ -258,7 +261,7 @@ THREAD_ENTRY precache_download_thread( void * data )
 				// construct local path
 				memset( localpath, 0, PRECACHE_TEMP_BUFFER_SIZE );
 				strcpy( localpath, precache->localpath );
-				strcat( localpath, precache->curfile->path );
+				strcat( localpath, precache->curfile->targetpath );
 				platform_conform_slashes( localpath, PRECACHE_TEMP_BUFFER_SIZE );
 
 				log_msg( "-> T: %i - Requesting a new file [remotepath=%s, localpath=%s]\n", thread_id, remotepath, localpath );
@@ -419,13 +422,14 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     ps.curfile->next = 0;
     memset( ps.curfile->checksum, 0, 33 );
     ps.curfile->flags = 0;
-    memset( ps.curfile->path, 0, 256 );
+    memset( ps.curfile->path, 0, MAX_PATH_SIZE );
     strcpy( ps.curfile->path, "/precache.list" );
+	strcpy( ps.curfile->targetpath, ps.curfile->path );
     ps.files = ps.curfile;
     ps.state = 0; // download precache.list mode.
 
     // setup configure the paths
-    memset( ps.remotepath, 0, 256 );
+    memset( ps.remotepath, 0, MAX_PATH_SIZE );
 	memset( ps.localpath, 0, MAX_PATH_SIZE );
 
     // the directory which contains the precache.list

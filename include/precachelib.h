@@ -6,7 +6,7 @@
 
 #define PRECACHE_TIMEOUT_MS 3000
 
-#define PRECACHE_URL "http://192.168.0.100/precache/mp"
+#define PRECACHE_URL "http://localhost/precache/mp"
 #define PRECACHE_WINDOW_TITLE "Precache Test"
 
 // define as > 0 to test rendering
@@ -24,6 +24,8 @@
 #define PRECACHE_STATE_ERROR 4
 
 
+
+
 #if _WIN32
     #define MAX_PATH_SIZE MAX_PATH
     #define PATH_SEPARATOR '\\'
@@ -36,6 +38,15 @@
 
 	#define strnicmp strncasecmp
 	#define stricmp strcasecmp
+#endif
+
+
+#if _WIN32
+	#define PRECACHE_PLATFORM 0
+#elif LINUX
+	#define PRECACHE_PLATFORM 1
+#elif __APPLE__
+	#define PRECACHE_PLATFORM 2
 #endif
 
 
@@ -74,9 +85,11 @@ enum PrecacheState
 
 typedef struct precache_file_s
 {
-    char path[ 256 ];
+    char path[ MAX_PATH_SIZE ];
+	char targetpath[ MAX_PATH_SIZE ]; // if specified, the destination where to save this file locally. otherwise, same as 'path'
     char checksum[ 33 ];
     int flags;
+	short platformid;
 	float timestamp;
 
     struct precache_file_s * next;
@@ -86,7 +99,7 @@ typedef struct precache_state_s
 {
     int state;
     char base[ 128 ];
-    char remotepath[ 256 ]; // a full url to the base folder where this project resides
+    char remotepath[ MAX_PATH_SIZE ]; // a full url to the base folder where this project resides
     char localpath[ MAX_PATH_SIZE ]; // an absolute path to the folder on the local machine where these files should be placed
     char precache_file[ MAX_PATH_SIZE ];
     char currentfilepath[ MAX_PATH_SIZE ];
