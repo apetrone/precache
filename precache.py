@@ -5,14 +5,18 @@ import json
 
 argc = len(sys.argv)
 if argc < 2:
-	print( "usage: python precache.py /path/to/target <target_name>" )
+	print( "usage: python precache.py /path/to/target <target_name> <ignores>" )
 	sys.exit(1)
 	
 path = sys.argv[1]
 base_folder = None
+ignores = None
+
+if argc > 2:
+	ignores = sys.argv[3]
 
 # if base_folder is specified
-if argc == 3:
+if argc > 2:
 	base_folder = sys.argv[2]
 else:
 	# if the path has a trailing slash, trim it off
@@ -59,16 +63,29 @@ output['base'] = base_folder
 output['filelist'] = []
 
 
+ignore_list = []
+if ignores != None:
+	for i in ignores.split(';'):
+		ignore_list.append( os.path.normpath(i) )
+	
 for root, dirs, files in os.walk( path ):
 	for f in files:
-		fullpath = root + os.path.sep + f
-		relative_path = make_relative_to( fullpath, path )
-		relative_path = relative_path.replace("\\", "/")
+		path_ignored = False
 		
-		filedata = {}
-		filedata['path'] = relative_path
-		filedata['md5'] = md5_from_file(fullpath)
-		output['filelist'].append( filedata )
+		for i in ignore_list:
+			if i in root:
+				path_ignored=True
+				break
+		
+		if not path_ignored:
+			fullpath = root + os.path.sep + f
+			relative_path = make_relative_to( fullpath, path )
+			relative_path = relative_path.replace("\\", "/")
+			
+			filedata = {}
+			filedata['path'] = relative_path
+			filedata['md5'] = md5_from_file(fullpath)
+			output['filelist'].append( filedata )
 
 jsondata = json.dumps(output, indent=4, sort_keys=True)
 
