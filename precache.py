@@ -76,6 +76,7 @@ output['filelist'] = []
 
 
 ignore_list = []
+map = None
 
 config_path = path + '/' + CONFIG_FILE
 
@@ -135,22 +136,22 @@ for root, dirs, files in os.walk( path ):
 			filedata['md5'] = md5_from_file(fullpath)
 			output['filelist'].append( filedata )
 
-			
-for src in map:
-	dst = map[src]
+if map != None:
+	for src in map:
+		dst = map[src]
 
-	fullpath = os.path.abspath(src)
-	
-	relative_path = dst
-	relative_path = relative_path.replace("\\", "/")
-	
-	#print('fullpath=%s' % fullpath )
-	#print('relative=%s' % relative_path )
-	filedata = {}
-	filedata['path'] = relative_path
-	filedata['md5'] = md5_from_file(fullpath)
-	filedata['platform'] = str(PLATFORM_ID)
-	output['filelist'].append( filedata )
+		fullpath = os.path.abspath(src)
+		
+		relative_path = dst
+		relative_path = relative_path.replace("\\", "/")
+		
+		#print('fullpath=%s' % fullpath )
+		#print('relative=%s' % relative_path )
+		filedata = {}
+		filedata['path'] = relative_path
+		filedata['md5'] = md5_from_file(fullpath)
+		filedata['platform'] = str(PLATFORM_ID)
+		output['filelist'].append( filedata )
 			
 jsondata = json.dumps(output, indent=4, sort_keys=True)
 
