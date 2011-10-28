@@ -52,8 +52,12 @@ def md5_from_file( file ):
 	
 	
 	return m.hexdigest()
-				
 
+
+def file_exists( path ):
+	return os.path.exists(path) and os.stat(path)
+	
+	
 CONFIG_FILE = 'precache.conf'
 PLATFORM_ID = 0
 
@@ -80,7 +84,8 @@ map = None
 config_path = os.path.normpath( cmdline.config_file )
 
 
-if os.path.exists(config_path) and os.stat( config_path ):
+
+if file_exists( config_path ):
 	print( 'Loading configuration from %s...' % config_path )
 	cfg = loadConfig( config_path )
 	
@@ -154,6 +159,7 @@ if map != None:
 	for src in map:
 		dst = map[src]
 		fullpath = os.path.abspath(cfg['abs_deploy_path'] + '/' + src)
+		if ( os.path.exists(
 		relative_path = dst
 		relative_path = relative_path.replace("\\", "/")
 		filedata = {}
