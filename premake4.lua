@@ -78,7 +78,26 @@ project "precache"
 		}
 	end
 	
+	
+	configuration { "release" }
+		if targetOS == "macosx" then
+			postbuildcommands
+			{
+				"cp ./resources/Info.plist build/bin/precache.app/Contents/",
+				"mkdir -p build/bin/precache.app/Contents/Resources/",
+				"cp ./resources/precache.icns build/bin/precache.app/Contents/Resources/"
+			}
+		end
+
 	configuration { "debug" }
+		if targetOS == "macosx" then
+			postbuildcommands
+			{
+				"cp ./resources/Info.plist build/bin/precached.app/Contents/",
+				"mkdir -p build/bin/precached.app/Contents/Resources/",
+				"cp ./resources/precache.icns build/bin/precached.app/Contents/Resources/"
+			}
+		end
 		targetsuffix "d"		
 		defines { "DEBUG" }
 		flags { "Symbols" }
