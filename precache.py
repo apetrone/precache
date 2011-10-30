@@ -2,34 +2,31 @@ import os
 import sys
 import hashlib
 import json
+import re
+import platform
+import argparse
 
-argc = len(sys.argv)
-if argc < 2:
-	print( "usage: python precache.py /path/to/target <target_name> <ignores>" )
-	sys.exit(1)
-	
-path = sys.argv[1]
-base_folder = None
-ignores = None
+def get_platform():
+	p = platform.platform().lower()
+	#print( "Platform: " + p )
+	if 'linux' in p:
+		return "linux"
+	elif "darwin" in p:
+		return "macosx"	
+	elif "nt" or "windows" in p:
+		return "windows"
+	else:
+		return "unknown"
 
-if argc > 2:
-	ignores = sys.argv[3]
+		
 
-# if base_folder is specified
-if argc > 2:
-	base_folder = sys.argv[2]
-else:
-	# if the path has a trailing slash, trim it off
-	if path[-1] == os.path.sep:
-		path = path[:-1]
-	
-	last_slash = path.rfind(os.path.sep)
-	if last_slash is not -1:
-		base_folder = "/" + path[ (last_slash+1): ]
-	
-# debug
-#print( "Path: " + path );
-#print( "Base Folder: " + base_folder )
+
+def loadConfig( file ):
+	f = open( file, "rb" )
+	data = f.read()
+	f.close()
+	d = json.loads( data )
+	return d
 
 #
 # functions
@@ -37,6 +34,7 @@ def make_relative_to( inpath, relpath ):
 	if relpath in inpath:
 		return inpath[ len(relpath): ]
 
+	
 def md5_from_file( file ):
 	hash = ''
 	block_size = 8192
@@ -54,40 +52,123 @@ def md5_from_file( file ):
 	
 	
 	return m.hexdigest()
-		
+
+
+def file_exists( path ):
+	return os.path.exists(path) and os.stat(path)
 	
-		
+	
+CONFIG_FILE = 'precache.conf'
+PLATFORM_ID = 0
+
+
+p = argparse.ArgumentParser( description='Generate precache.list for a project' )
+#p.add_argument( '-t', '--target', dest='target_path', metavar='TARGET_PATH', required=True )
+#p.add_argument( '-o', '--output', dest='output_file', metavar='OUTPUT_FILE', required=True )
+p.add_argument( '-f', '--file', dest='config_file', metavar='CONFIG_FILE', required=True )
+
+
+cmdline = p.parse_args()
+
+ignores = None
+
+	
+PRECACHE_FILE = 'precache.list'
 output = {}
 output['version'] = 1
-output['base'] = base_folder
+output['base'] = ''
 output['filelist'] = []
-
-
+cfg = {}
 ignore_list = []
-if ignores != None:
-	for i in ignores.split(';'):
-		ignore_list.append( os.path.normpath(i) )
+map = None
+config_path = os.path.normpath( cmdline.config_file )
+
+
+
+if file_exists( config_path ):
+	print( 'Loading configuration from %s...' % config_path )
+	cfg = loadConfig( config_path )
 	
-for root, dirs, files in os.walk( path ):
+	excludes = []
+	if 'excludes' in cfg:
+		excludes = cfg['excludes']
+	
+	for e in excludes:
+		
+		e = os.path.normpath( e )
+		e = e.replace('\\', '\\\\')
+		e = e.replace('.', '\\.')
+		e = e.replace('*', '.*')
+		pat = re.compile( e )
+		ignore_list.append( pat )
+		
+	map = []
+	if 'map' in cfg:
+		map = cfg['map']
+		myos = get_platform()
+		if myos in map:
+			map = map[ myos ]
+		
+		
+	cfg['abs_target_path'] = os.path.normpath( os.path.abspath( os.path.dirname( cmdline.config_file ) ) )
+	print( 'Absolute target path: %s' % cfg['abs_target_path'] )
+	cfg['abs_deploy_path'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['target_path']))
+	print( 'Absolute deploy path: %s' % cfg['abs_deploy_path'] )
+
+	output['base'] = cfg['basename']
+else:
+	print( 'Configuration %s not found' % config_path )
+
+cfg['output_file'] = os.path.normpath( cfg['abs_target_path'] + '/' + PRECACHE_FILE )
+
+
+
+# determine platform id
+# NOTE: These values MUST match the same values in the precache.h
+pstring = get_platform()
+if pstring == "windows":
+	PLATFORM_ID = 0
+elif pstring == "linux":
+	PLATFORM_ID = 1
+elif pstring == "macosx":
+	PLATFORM_ID = 2
+
+def add_file( fullpath, relative_path, filedata ):
+	filedata['path'] = relative_path
+	filedata['md5'] = md5_from_file(fullpath)
+	output['filelist'].append( filedata )
+for root, dirs, files in os.walk( cfg['abs_deploy_path'] ):
 	for f in files:
 		path_ignored = False
+		fullpath = root + os.path.sep + f
 		
 		for i in ignore_list:
-			if i in root:
+			if i.match( fullpath ):
+				#print( 'MATCH: %s' % i.pattern )
+				#print( 'ignored: %s' % fullpath )
 				path_ignored=True
 				break
 		
 		if not path_ignored:
-			fullpath = root + os.path.sep + f
-			relative_path = make_relative_to( fullpath, path )
+			relative_path = make_relative_to( fullpath, cfg['abs_deploy_path'] )
 			relative_path = relative_path.replace("\\", "/")
-			
-			filedata = {}
-			filedata['path'] = relative_path
-			filedata['md5'] = md5_from_file(fullpath)
-			output['filelist'].append( filedata )
+			add_file( fullpath, relative_path, {} )
+
+# take care of platform-specific files
+if map != None:
+	for src in map:
+		dst = map[src]
+		fullpath = os.path.abspath(cfg['abs_deploy_path'] + '/' + src)
+		if ( os.path.exists(
+		relative_path = dst
+		relative_path = relative_path.replace("\\", "/")
+		filedata = {}
+		filedata['platform'] = str(PLATFORM_ID)
+		add_file( fullpath, relative_path, filedata )
 
 jsondata = json.dumps(output, indent=4, sort_keys=True)
 
-
-print(jsondata)
+print( 'Writing precache file: %s' % cfg['output_file'] )
+out = open( cfg['output_file'], 'wb' )
+out.write( jsondata )
+out.close()
