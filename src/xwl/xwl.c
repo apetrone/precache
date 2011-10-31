@@ -266,7 +266,6 @@ const char * xwl_mouse_to_string( i32 mb )
 {
 	switch( mb )
 	{
-		case XWLMB_INVALID: return "XWLMB_INVALID";
 		case XWLMB_LEFT: return "XWLMB_LEFT";
 		case XWLMB_RIGHT: return "XWLMB_RIGHT";
 		case XWLMB_MIDDLE: return "XWLMB_MIDDLE";
@@ -655,25 +654,6 @@ i32 xwl_startup()
 #ifdef _WIN32
 	// initialize key map
 	lshift = MapVirtualKey(VK_LSHIFT, MAPVK_VK_TO_VSC);
-
-	// register class
-	{
-		WNDCLASSEX wcx;
-		wcx.cbSize = sizeof( WNDCLASSEX );
-		wcx.cbClsExtra = 0;
-		wcx.cbWndExtra = 0;
-		wcx.hbrBackground = 0;
-		wcx.hCursor = LoadCursor( 0, IDC_ARROW );
-		wcx.hIcon = 0; //LoadIcon( NULL, IDI_APPLICATION );
-		wcx.hIconSm = 0; //LoadIcon( NULL, IDI_APPLICATION );
-		wcx.hInstance = (HINSTANCE)GetModuleHandle(0);
-		wcx.lpfnWndProc = WndProc; // long pointer-to-function WindowProc
-		wcx.lpszClassName = xwl_windowClassName;
-		wcx.lpszMenuName = 0;
-		wcx.style = CS_VREDRAW | CS_HREDRAW | CS_OWNDC | CS_DBLCLKS;
-
-		RegisterClassEx( &wcx );
-	}
 #endif
 
 #if LINUX
@@ -1091,7 +1071,44 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title,
 	wchar_t windowName[ 128 ];
 	//memset( windowName, 0, 128 );
 	HWND handle;
+	WNDCLASSEX wcx_info;
+	WNDCLASSEX wcx;
 
+	// see if the window class already exists...
+	if ( GetClassInfoEx( 0, xwl_windowClassName, &wcx_info ) == 0 )
+	{
+		// class does not exist; create it 
+		wcx.cbSize = sizeof( WNDCLASSEX );
+		wcx.cbClsExtra = 0;
+		wcx.cbWndExtra = 0;
+		wcx.hbrBackground = 0;
+		wcx.hCursor = LoadCursor( 0, IDC_ARROW );
+		if ( params->flags & XWL_WIN32_ICON )
+		{
+			wcx.hIcon = params->hIcon;
+		}
+		else
+		{
+			wcx.hIcon = 0;
+		}
+
+		if ( params->flags & XWL_WIN32_ICONSM )
+		{
+			wcx.hIconSm = params->hIconSm;
+		}
+		else
+		{
+			wcx.hIconSm = 0;
+		}
+
+		wcx.hInstance = (HINSTANCE)GetModuleHandle(0);
+		wcx.lpfnWndProc = WndProc; // long pointer-to-function WindowProc
+		wcx.lpszClassName = xwl_windowClassName;
+		wcx.lpszMenuName = 0;
+		wcx.style = CS_VREDRAW | CS_HREDRAW | CS_OWNDC | CS_DBLCLKS;
+
+		RegisterClassEx( &wcx );
+	}
 
 
 	if ( title == 0 )

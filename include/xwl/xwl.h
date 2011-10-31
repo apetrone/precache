@@ -142,7 +142,15 @@ enum
 	XWLK_LCONTROL,
 	XWLK_RCONTROL,
 	XWLK_LALT,
-	XWLK_RALT
+	XWLK_RALT,
+
+	XWLMB_LEFT,
+	XWLMB_RIGHT,
+	XWLMB_MIDDLE,
+	XWLMB_MOUSE4,
+	XWLMB_MOUSE5,
+	XWLMB_MOUSE6,
+	XWLMB_MOUSE7
 };
 
 // key mods
@@ -153,19 +161,6 @@ enum
 	XWLKM_ALT = 1,
 	XWLKM_SHIFT = 2,
 	XWLKM_CONTROL = 4
-};
-
-// mouse buttons
-enum
-{
-	XWLMB_INVALID,
-	XWLMB_LEFT,
-	XWLMB_RIGHT,
-	XWLMB_MIDDLE,
-	XWLMB_MOUSE4,
-	XWLMB_MOUSE5,
-	XWLMB_MOUSE6,
-	XWLMB_MOUSE7
 };
 
 // window creation constants
@@ -205,6 +200,11 @@ enum
 	XWL_FULLSCREEN = 1, // start window full screen
 	XWL_NORESIZE = 2, // disable window resizing,
 	XWL_OPENGL = 4, // setup opengl rendering
+	
+#if _WIN32
+	XWL_WIN32_ICON = 8,
+	XWL_WIN32_ICONSM = 16,
+#endif
 };
 
 // OpenGL Attributes
@@ -254,6 +254,11 @@ typedef struct xwl_windowparams_s
 	u32 y;
 	void * userdata;
 	char * title;
+
+#if _WIN32
+	HICON hIcon;
+	HICON hIconSm;
+#endif
 } xwl_windowparams_t;
 	
 typedef struct
@@ -313,7 +318,7 @@ void xwl_shutdown();
 i32 xwl_pollevent( xwl_event_t *event );
 
 // returns 0 on failure
-// tite is a UTF-8 encoded string
+// title is a UTF-8 encoded string
 xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title, u32 * attribs );
 
 // set the event callback

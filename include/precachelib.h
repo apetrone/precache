@@ -3,16 +3,16 @@
 #include "md5.h"
 #include "JSON_parser.h"
 #include "http.h"
+#include "vars.h"
 
+#define PRECACHE_USER_AGENT "precache-downloader"
 #define PRECACHE_TIMEOUT_MS 3000
-#define PRECACHE_URL "http://192.168.0.100/precache/mp"
-#define PRECACHE_WINDOW_TITLE "Precache Test"
 #define PRECACHE_TEMP_BUFFER_SIZE 512
 #define PRECACHE_STATE_DOWNLOAD_REQUEST 1 // request to download a file
 #define PRECACHE_STATE_DOWNLOAD 2 // downloading a file
 #define PRECACHE_STATE_EXIT 3
 #define PRECACHE_STATE_ERROR 4
-#define PRECACHE_USER_AGENT "precache-downloader"
+
 
 #define KB_DIV 1024
 #define MB_DIV 1048576

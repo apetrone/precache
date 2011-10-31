@@ -44,9 +44,67 @@ I have tested the following project files under the respective OS.
 
 	Windows
 	premake4 vs2008
-	* You may need to clear the entry point from the visual studio project properties so it does not look for "mainCRTStartup"
+	* You may need to clear the entry point from the visual studio project properties so it does not look for "mainCRTStartup".
+	This appears to be a bug in the current version of Premake4.
 
 
+CUSTOMIZATION
 
+By editing include/vars.h; you can adjust some variables for precache such as the URL, Window title, etc.
+
+Application icon: edit the file pertaining to the associated platform. 
+	You can create new icons using png2ico (Windows), Icon Composer (Mac OSX). 
+	Simply replace the file and build the binary again.
+
+	Windows:
+		resources/precache.ico
+		
+	Mac OSX:
+		resources/precache.icns
+		
+
+Sample configuration file:
+{	
+	"target_path" : "./build",
+	"basename" : "project_name",
+	
+	"excludes" : 
+	[
+		"*bin/*",
+		"*obj/*",
+		"*logs/*",
+		"*.pch",
+		"*.ipch",
+		"*.conf",
+		"*.pdb",
+		"*.ilk",
+		"*.sdf",
+		"*.sln",
+		"*.suo",
+		"*.vcproj",
+		"*.vcxproj"
+	],
+	
+	"map" :
+	{
+		"windows" :
+		{
+			"bin/x64/windows/file.exe" : "bin/x64/file.exe",
+			"bin/x86/windows/file.exe" : "bin/x86/file.exe"
+		},
+		
+		"linux" : 
+		{
+			"bin/x64/linux/file" : "bin/x64/file",
+			"bin/x86/linux/file" : "bin/x86/file"
+		},
+		
+		"macosx" :
+		{
+			"bin/x64/macosx/file.app" : "bin/x64/file.app",
+			"bin/x86/macosx/file.app" : "bin/x86/file.app"
+		}
+	}
+}
 
 

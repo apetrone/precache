@@ -3,30 +3,11 @@ import sys
 import hashlib
 import json
 import re
-import platform
 import argparse
 
-def get_platform():
-	p = platform.platform().lower()
-	#print( "Platform: " + p )
-	if 'linux' in p:
-		return "linux"
-	elif "darwin" in p:
-		return "macosx"	
-	elif "nt" or "windows" in p:
-		return "windows"
-	else:
-		return "unknown"
-
-		
+from utils import get_platform, file_exists, load_config
 
 
-def loadConfig( file ):
-	f = open( file, "rb" )
-	data = f.read()
-	f.close()
-	d = json.loads( data )
-	return d
 
 #
 # functions
@@ -54,10 +35,6 @@ def md5_from_file( file ):
 	return m.hexdigest()
 
 
-def file_exists( path ):
-	return os.path.exists(path) and os.stat(path)
-	
-	
 CONFIG_FILE = 'precache.conf'
 PLATFORM_ID = 0
 
@@ -87,7 +64,7 @@ config_path = os.path.normpath( cmdline.config_file )
 
 if file_exists( config_path ):
 	print( 'Loading configuration from %s...' % config_path )
-	cfg = loadConfig( config_path )
+	cfg = load_config( config_path )
 	
 	excludes = []
 	if 'excludes' in cfg:
@@ -159,12 +136,14 @@ if map != None:
 	for src in map:
 		dst = map[src]
 		fullpath = os.path.abspath(cfg['abs_deploy_path'] + '/' + src)
-		if ( os.path.exists(
-		relative_path = dst
-		relative_path = relative_path.replace("\\", "/")
-		filedata = {}
-		filedata['platform'] = str(PLATFORM_ID)
-		add_file( fullpath, relative_path, filedata )
+		if file_exists( fullpath ):
+			relative_path = dst
+			relative_path = relative_path.replace("\\", "/")
+			filedata = {}
+			filedata['platform'] = str(PLATFORM_ID)
+			add_file( fullpath, relative_path, filedata )
+		else:
+			print( 'File does not exist: %s' % fullpath )
 
 jsondata = json.dumps(output, indent=4, sort_keys=True)
 

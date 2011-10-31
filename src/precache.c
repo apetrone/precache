@@ -29,6 +29,10 @@
 #include "precachelib.h"
 #include "precache.h"
 
+#if _WIN32
+	#include "resource.h"
+#endif
+
 typedef struct
 {
 	font_t font;
@@ -726,6 +730,11 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
     p.width = 450;
     p.height = 130;
     p.flags = XWL_OPENGL | XWL_WINDOWED | XWL_NORESIZE;
+
+#if _WIN32
+	p.flags |= XWL_WIN32_ICON;
+	p.hIcon = LoadIcon( GetModuleHandle(0), MAKEINTRESOURCE( IDI_PRECACHE_ICON ) );
+#endif
 
     net_startup();
     xwl_startup();
