@@ -762,8 +762,17 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	set_msg_color( 255, 255, 255, 255 );
 
 #if PRECACHE_TEST
-	strcpy( state.msg, "Testing message one string..." );
-	strcpy( state.msg2, "Testing message two string..." );
+	strcpy( state.msg, "PRECACHE_TEST is enabled..." );
+
+	if ( platform_is64bit() )
+	{
+		strcpy( state.msg2, "x86_64 OS detected." );
+	}
+	else
+	{
+		strcpy( state.msg2, "x86 OS detected." );
+	}
+	//strcpy( state.msg2, "Testing message two string..." );
 #else
 	strcpy( state.msg, "Downloading precache.list..." );
 	mutex_create( &state.dl );

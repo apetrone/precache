@@ -197,9 +197,28 @@ int platform_is64bit()
 	BOOL b64;
 	return IsWow64Process( GetCurrentProcess(), &b64 ) && b64;
 #elif LINUX
+
+	char data[32] = {0};
+	FILE * fp;
+	fp = popen( "uname -m", "r" );
+	if ( !fp )
+	{
+		return 0;
+	}
+
+	if ( !fgets( data, 7, fp ) )
+	{
+		return 0;
+	}
+
+	if ( !strncmp( data, "x86_64", 6 ) )
+	{
+		return 1;
+	}
 #elif __APPLE__
 #endif
 
+	return 0;
 }
 
 #ifdef __cplusplus
