@@ -58,6 +58,11 @@ extern "C"
 	// make all directories in the path tree
 	void platform_makedirs( const char * normalized_path );
 
+	// spawn a process; returns nonzero on success, zero on failure
+	int platform_spawn_process( const char * path );
+
+	// returns nonzero if this platform is 64bit; otherwise returns 0
+	int platform_is64bit();
 #ifdef __cplusplus
 }; // extern "C"
 #endif

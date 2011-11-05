@@ -391,8 +391,7 @@ void process_downloads()
 				
 #endif
 #endif
-
-				log_msg( "platform_makedirs( \"%s\" )\n", state.ps.localpath );
+				
 				platform_makedirs( state.ps.localpath );
 
 				strcpy( state.msg, "Calculating MD5 checksums..." );

@@ -20,7 +20,7 @@
 
 // define as > 0 to test rendering
 // define as 0 for normal operations
-#define PRECACHE_TEST 0
+#define PRECACHE_TEST 1
 
 
 #if _WIN32

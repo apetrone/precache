@@ -165,6 +165,43 @@ void platform_makedirs( const char * normalized_path )
 	}
 }
 
+// ------------------------------------------------------------------
+int platform_spawn_process( const char * path )
+{
+	int value;
+#if _WIN32
+	STARTUPINFOA startupInfo;
+	PROCESS_INFORMATION processInfo;
+
+	memset( &startupInfo, 0, sizeof(STARTUPINFO) );
+	startupInfo.cb = sizeof(STARTUPINFO);
+
+	memset( &processInfo, 0, sizeof(PROCESS_INFORMATION) );
+
+	// returns nonzero on success, 0 on failure
+	value = CreateProcessA( path, 0, 0, 0, 0, NORMAL_PRIORITY_CLASS, 0, 0, &startupInfo, &processInfo );
+#elif LINUX
+
+
+#elif __APPLE__
+
+#endif
+
+	return value;
+}
+
+// ------------------------------------------------------------------
+int platform_is64bit()
+{
+#if _WIN32
+	BOOL b64;
+	return IsWow64Process( GetCurrentProcess(), &b64 ) && b64;
+#elif LINUX
+#elif __APPLE__
+#endif
+
+}
+
 #ifdef __cplusplus
 }; // extern "C"
 #endif
