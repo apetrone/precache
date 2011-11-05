@@ -36,7 +36,6 @@ def md5_from_file( file ):
 
 
 CONFIG_FILE = 'precache.conf'
-PLATFORM_ID = 0
 
 
 p = argparse.ArgumentParser( description='Generate precache.list for a project' )
@@ -82,9 +81,9 @@ if file_exists( config_path ):
 	map = []
 	if 'map' in cfg:
 		map = cfg['map']
-		myos = get_platform()
-		if myos in map:
-			map = map[ myos ]
+		#myos = get_platform()
+		#if myos in map:
+		#	map = map[ myos ]
 		
 		
 	cfg['abs_target_path'] = os.path.normpath( os.path.abspath( os.path.dirname( cmdline.config_file ) ) )
@@ -93,6 +92,8 @@ if file_exists( config_path ):
 	print( 'Absolute deploy path: %s' % cfg['abs_deploy_path'] )
 
 	output['base'] = cfg['basename']
+	if output['base'][0] is not '/':
+		output['base'] = '/' + output['base']
 else:
 	print( 'Configuration %s not found' % config_path )
 
@@ -101,14 +102,16 @@ cfg['output_file'] = os.path.normpath( cfg['abs_target_path'] + '/' + PRECACHE_F
 
 
 # determine platform id
-# NOTE: These values MUST match the same values in the precache.h
-pstring = get_platform()
-if pstring == "windows":
-	PLATFORM_ID = 0
-elif pstring == "linux":
-	PLATFORM_ID = 1
-elif pstring == "macosx":
-	PLATFORM_ID = 2
+# NOTE: These values MUST match the same values in the precachelib.h
+def get_platform_id( pstring ):
+	if pstring == "windows":
+		return 0
+	elif pstring == "linux":
+		return 1
+	elif pstring == "macosx":
+		return 2
+	return None	
+	
 
 def add_file( fullpath, relative_path, filedata ):
 	filedata['path'] = relative_path
@@ -133,18 +136,21 @@ for root, dirs, files in os.walk( cfg['abs_deploy_path'] ):
 
 # take care of platform-specific files
 if map != None:
-	for src in map:
-		dst = map[src]
-		fullpath = os.path.abspath(cfg['abs_deploy_path'] + '/' + src)
-		if file_exists( fullpath ):
-			relative_path = dst
-			relative_path = relative_path.replace("\\", "/")
-			filedata = {}
-			filedata['platform'] = str(PLATFORM_ID)
-			add_file( fullpath, relative_path, filedata )
-		else:
-			print( 'File does not exist: %s' % fullpath )
-
+	for platform_string in map:
+		
+		for src in map[platform_string]:
+			dst = map[platform_string][src]
+			fullpath = os.path.abspath(cfg['abs_deploy_path'] + '/' + src)
+			if file_exists( fullpath ):
+				relative_path = src
+				relative_path = relative_path.replace("\\", "/")
+				filedata = {}
+				filedata['os'] = get_platform_id(platform_string)
+				filedata['target'] = dst
+				add_file( fullpath, relative_path, filedata )
+			else:
+				print( 'File does not exist: %s' % fullpath )
+				
 jsondata = json.dumps(output, indent=4, sort_keys=True)
 
 print( 'Writing precache file: %s' % cfg['output_file'] )

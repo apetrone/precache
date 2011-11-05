@@ -372,6 +372,7 @@ void process_downloads()
             {
 				// cat the base path onto the binary directory...
 				strcat( state.ps.localpath, state.ps.base );
+				platform_conform_slashes( state.ps.localpath, MAX_PATH_SIZE );
 
                 // ensure this directory exists..
 #if 0
@@ -390,6 +391,8 @@ void process_downloads()
 				
 #endif
 #endif
+
+				log_msg( "platform_makedirs( \"%s\" )\n", state.ps.localpath );
 				platform_makedirs( state.ps.localpath );
 
 				strcpy( state.msg, "Calculating MD5 checksums..." );

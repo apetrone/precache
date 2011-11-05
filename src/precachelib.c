@@ -21,6 +21,13 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             }
             else if ( (ps->flags & 2) )
             {
+				if ( ps->state->curfile )
+				{
+					if ( stricmp( ps->lastkey, "os" ) == 0 )
+					{
+						ps->state->curfile->platformid = (int)value->vu.integer_value;
+					}
+				}
             }
             break;
         case JSON_T_ARRAY_BEGIN:
@@ -83,10 +90,6 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 					else if ( stricmp( ps->lastkey, "md5" ) == 0 )
 					{
 						strncpy( ps->state->curfile->checksum, value->vu.str.value, 32 );
-					}
-					else if ( stricmp( ps->lastkey, "os" ) == 0 )
-					{
-						ps->state->curfile->platformid = atoi( value->vu.str.value );
 					}
 				}
             }
