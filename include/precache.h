@@ -30,12 +30,4 @@ typedef struct button_s
 	button_event event;
 } button;
 
-#if _WIN32
-#	define PLATFORM_ID 0
-#elif LINUX
-#	define PLATFORM_ID 1
-#elif __APPLE__
-#	define PLATFORM_ID 2
-#endif
-
 i32 mouse_inside_button( button * b );
