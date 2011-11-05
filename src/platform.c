@@ -12,7 +12,7 @@
 	#include <sys/stat.h>
 	#include <stdio.h> // for snprintf
     #include <stdlib.h> // for abort
-	//#include <unistd.h>
+	#include <unistd.h>
 #elif __APPLE__
 	#include <sys/stat.h>
 	#include <inttypes.h>
@@ -181,8 +181,16 @@ int platform_spawn_process( const char * path )
 	// returns nonzero on success, 0 on failure
 	value = CreateProcessA( path, 0, 0, 0, 0, NORMAL_PRIORITY_CLASS, 0, 0, &startupInfo, &processInfo );
 #elif LINUX
+	pid_t pid;
+	const char * args[ 1024 ];
+	memset( args, 0, sizeof(char*)*1024 );
 
-
+	pid = fork();
+	if ( pid == 0 )
+	{
+		execvp( path, (char**)args );
+		return 1;
+	}
 #elif __APPLE__
 
 #endif
