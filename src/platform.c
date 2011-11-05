@@ -14,8 +14,11 @@
     #include <stdlib.h> // for abort
 	#include <unistd.h>
 #elif __APPLE__
+	#include <sys/types.h>
+	#include <stdio.h>
 	#include <sys/stat.h>
 	#include <inttypes.h>
+	#include <unistd.h>
 #endif
 
 #ifdef __cplusplus
@@ -180,19 +183,23 @@ int platform_spawn_process( const char * path )
 
 	// returns nonzero on success, 0 on failure
 	value = CreateProcessA( path, 0, 0, 0, 0, NORMAL_PRIORITY_CLASS, 0, 0, &startupInfo, &processInfo );
-#elif LINUX
+#elif LINUX || __APPLE__
 	pid_t pid;
+	
+#if LINUX
 	const char * args[ 1024 ];
 	memset( args, 0, sizeof(char*)*1024 );
+#else
+	char * const args[] = { "/bin/echo", "success", 0 };
+#endif
 
 	pid = fork();
+	value = 1;
 	if ( pid == 0 )
 	{
 		execvp( path, (char**)args );
 		return 1;
 	}
-#elif __APPLE__
-
 #endif
 
 	return value;
@@ -204,7 +211,7 @@ int platform_is64bit()
 #if _WIN32
 	BOOL b64;
 	return IsWow64Process( GetCurrentProcess(), &b64 ) && b64;
-#elif LINUX
+#elif LINUX || __APPLE__
 
 	char data[32] = {0};
 	FILE * fp;
@@ -223,7 +230,6 @@ int platform_is64bit()
 	{
 		return 1;
 	}
-#elif __APPLE__
 #endif
 
 	return 0;
