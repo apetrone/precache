@@ -23,9 +23,9 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             {
 				if ( ps->state->curfile )
 				{
-					if ( stricmp( ps->lastkey, "os" ) == 0 )
+					if ( stricmp( ps->lastkey, "flags" ) == 0 )
 					{
-						ps->state->curfile->platformid = (int)value->vu.integer_value;
+						ps->state->curfile->extra_flags = (int)value->vu.integer_value;
 					}
 				}
             }
@@ -47,7 +47,7 @@ int parse_json( void *ctx, int type, const JSON_value * value )
                 memset( file, 0, sizeof(precache_file_t) );
                 file->next = ps->state->files;
                 file->flags = 0;
-				file->platformid = -1;
+				file->extra_flags = 0;
 				memset( file->targetpath, 0, MAX_PATH_SIZE );
 				memset( file->path, 0, MAX_PATH_SIZE );
                 ps->state->files = file;
@@ -217,26 +217,65 @@ precache_file_t * precache_locate_next_file( precache_file_t * start )
 {
 	precache_file_t * cur = start;
 	precache_file_t * next = 0;
+	int platform_id;
 
-	//log_msg( "* LOC: start is [%s]\n", start->path );
+	log_msg( "* LOC: start is [%s]\n", start->path );
 	do
 	{
-		// this file hasn't been downloaded... AND
-		// this file matches this is platform agnostic or matches platform ID
-		if ( !(cur->flags & 1) && (cur->platformid == -1 || (cur->platformid == PRECACHE_PLATFORM)) )
+		// is this file platform agnostic?
+		platform_id = ((cur->extra_flags >> PRECACHE_FILE_PLATFORM_BIT) & 0x0F);
+		if ( platform_id == 0 || platform_id == PRECACHE_PLATFORM )
 		{
-			//log_msg( "* LOC: file not downloaded: [%s]\n", cur->path );
-			next = cur;
-			break;
+			// has this file been downloaded yet?
+			if ( !(cur->flags & 1) )
+			{
+				log_msg( "* LOC: file not downloaded: [%s]\n", cur->path );
+				next = cur;
+				break;
+			}
+			else
+			{
+				log_msg( "* LOC: file downloaded, skipping: [%s]\n", cur->path );
+			}
 		}
-
-		//log_msg( "* LOC: file downloaded, skipping: [%s]\n", cur->path );
+		else
+		{
+			log_msg( "* LOC: file not required for this platform: [%s]\n", cur->path );
+		}
+		
 		cur = cur->next;
 	} while( cur );
 
 	return next;
 } // precache_locate_next_file
 
+precache_file_t * precache_locate_executable_file( precache_file_t * start )
+{
+	precache_file_t * cur = start;
+	precache_file_t * next = 0;
+	int platform_id;
+	int executable_bit;
+
+	log_msg( "* precache_locate_executable_file: start is [%s]\n", start->path );
+	do
+	{
+		// is this file platform agnostic?
+		platform_id = ((cur->extra_flags >> PRECACHE_FILE_PLATFORM_BIT) & 0x0F);
+		if ( platform_id == 0 || platform_id == PRECACHE_PLATFORM )
+		{
+			executable_bit = ((cur->extra_flags >> PRECACHE_FILE_EXECUTE_BIT) & 0x0F);
+			if ( executable_bit > 0 )
+			{
+				log_msg( "* precache_locate_executable_file: found first executable file [%s]\n", cur->path );
+				return cur;
+			}
+		}
+
+		cur = cur->next;
+	} while( cur );
+
+	return next;
+} // precache_locate_executable_file
 
 void md5_from_path( const char * filename, char * digest )
 {

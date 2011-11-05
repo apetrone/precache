@@ -453,6 +453,7 @@ void process_downloads()
 			strcpy( state.msg2, "" );
 			set_msg_color( 0, 255, 0, 255 );
 			state.running = 0;
+			state.ps.state = PS_COMPLETED;
 		}
 		else
 		{
@@ -614,6 +615,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	xwl_windowparams_t p;
 	precache_file_t * file;
 	char log_path[ MAX_PATH_SIZE ];
+	char temp_path[ MAX_PATH_SIZE ];
 
 
 	timer_startup(&state.ts);
@@ -794,6 +796,31 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	{
 		thread_stop( &state.t0 );
 	}
+
+	// try to find a file (for this platform) with the execute bit set
+	if ( state.ps.state == PS_COMPLETED )
+	{
+		file = precache_locate_executable_file( state.ps.files );
+		if ( file )
+		{
+			log_msg( "* Located executable file [%s]\n", file->targetpath );
+
+			// construct local path
+			memset( temp_path, 0, MAX_PATH_SIZE );
+			strcpy( temp_path, state.ps.localpath );
+			strcat( temp_path, file->targetpath );
+			platform_conform_slashes( temp_path, MAX_PATH_SIZE );
+			
+			log_msg( "* Executable file is [%s]\n", temp_path );
+
+			log_msg( "* Set permissions on file...\n" );
+
+
+			log_msg( "* Spawn process.\n" );
+			platform_spawn_process( temp_path );
+		}
+	}
+
 #endif
 
 	mutex_destroy( &state.dl );

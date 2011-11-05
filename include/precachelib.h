@@ -37,15 +37,24 @@
 	#define stricmp strcasecmp
 #endif
 
-
+// NOTE: These constants should match the constants in precache.py! (get_platform_id, get_arch_id)
 #if _WIN32
-	#define PRECACHE_PLATFORM 0
-#elif LINUX
 	#define PRECACHE_PLATFORM 1
-#elif __APPLE__
+#elif LINUX
 	#define PRECACHE_PLATFORM 2
+#elif __APPLE__
+	#define PRECACHE_PLATFORM 3
 #endif
 
+#define PRECACHE_ARCH_X86 1
+#define PRECACHE_ARCH_X64 2
+
+enum
+{
+	PRECACHE_FILE_ARCH_BIT = 0,
+	PRECACHE_FILE_PLATFORM_BIT = 4,
+	PRECACHE_FILE_EXECUTE_BIT = 8
+};
 
 enum PrecacheState
 {
@@ -78,6 +87,9 @@ enum PrecacheState
 
 	// currently downloading
 	PS_DOWNLOADING,
+
+	// operations completed successfully
+	PS_COMPLETED
 };
 
 typedef struct precache_file_s
@@ -86,7 +98,7 @@ typedef struct precache_file_s
 	char targetpath[ MAX_PATH_SIZE ]; // if specified, the destination where to save this file locally. otherwise, same as 'path'
     char checksum[ 33 ];
     int flags;
-	short platformid;
+	short extra_flags;
 	float timestamp;
 
     struct precache_file_s * next;
@@ -128,3 +140,4 @@ typedef char md5_digest_t[ 33 ];
 void md5_from_path( const char * filename, char * digest );
 int precache_parse_list( precache_state_t * precache );
 precache_file_t * precache_locate_next_file( precache_file_t * start );
+precache_file_t * precache_locate_executable_file( precache_file_t * start );
