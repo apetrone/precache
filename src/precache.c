@@ -773,12 +773,6 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 		strcpy( state.msg2, "x86 OS detected." );
 	}
 	//strcpy( state.msg2, "Testing message two string..." );
-	
-	if ( platform_spawn_process( "/Users/apetrone/Documents/aengine/source/main/build/bin/x86/release/aengine" ) )
-	{
-		printf( "closing program....\n" );
-		state.running = 0;
-	}
 #else
 	strcpy( state.msg, "Downloading precache.list..." );
 	mutex_create( &state.dl );
