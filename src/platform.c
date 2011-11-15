@@ -209,8 +209,20 @@ int platform_spawn_process( const char * path )
 int platform_is64bit()
 {
 #if _WIN32
-	BOOL b64;
-	return IsWow64Process( GetCurrentProcess(), &b64 ) && b64;
+	// described in MSDN; this function isn't supported on all versions of Windows.
+	// We must check and see if kernel32.dll implements it first.
+	typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);
+	LPFN_ISWOW64PROCESS fnIsWow64Process;
+	BOOL b64 = 0;
+
+	fnIsWow64Process = (LPFN_ISWOW64PROCESS) GetProcAddress(GetModuleHandle(TEXT("kernel32")),"IsWow64Process");
+
+    if(NULL != fnIsWow64Process)
+    {
+        !fnIsWow64Process(GetCurrentProcess(),&b64);
+    }
+
+	return b64;
 #elif LINUX || __APPLE__
 
 	char data[32] = {0};
