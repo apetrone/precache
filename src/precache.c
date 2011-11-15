@@ -314,7 +314,7 @@ THREAD_ENTRY precache_calculate_checksums( void * data )
 	while( file )
 	{
 		// if this file has NOT already been downloaded...
-		if ( !(file->flags & 1) )
+		if ( !(file->flags & PF_DOWNLOADED) )
 		{
 			// file has a valid checksum read from the precache list
 			if ( file->checksum[0] != '\0' )
@@ -327,17 +327,19 @@ THREAD_ENTRY precache_calculate_checksums( void * data )
 
 				md5_from_path( localpath, digest );
 
+				//log_msg( "* MD5 Checksum = %s\n", digest );
+
 				// if the local checksum matches the one specified in the precache list, set the skip flag on this file
 				if ( stricmp( digest, file->checksum ) == 0 )
 				{
 					//log_msg( "* MD5 Checksums match for file \"%s\" (%s)\n", file->path, digest );
-					file->flags |= 1;
+					file->flags |= PF_DOWNLOADED;
 				}
 			}
 
-			if ( !(file->flags & 1) )
+			if ( !(file->flags & PF_DOWNLOADED) )
 			{
-				//log_msg( "* MD5 Checksums DO NOT MATCH for file \"%s\" (%s)\n", file->path, digest );
+				//log_msg( "* MD5 Checksums DO NOT MATCH for file \"%s\" (%s, expected: %s)\n", file->path, digest, file->checksum );
 			}
 		}
 
@@ -365,7 +367,7 @@ void process_downloads()
 			state.downloadPercent = 1;
 			log_msg( "* Finished downloading precache.list\n" );
 			state.ps.state = PS_PARSING_LIST;
-			state.ps.curfile->flags = 1; // downloaded
+			state.ps.curfile->flags = PF_DOWNLOADED; // downloaded
 
             // analyze the precache list and update the file list
             if ( precache_parse_list( &state.ps ) )
@@ -492,7 +494,7 @@ void process_downloads()
 
 			state.downloadState.completed = 0;
 			log_msg( "\tDownloading \"%s\" -> success! (%i/%i)\n", state.ps.curfile->path, state.downloadState.bytes_read, state.downloadState.content_length );
-			state.ps.curfile->flags = 1;
+			state.ps.curfile->flags = PF_DOWNLOADED;
 			state.ps.state = PS_DOWNLOAD_NEXT;
 		}
 		else
@@ -615,7 +617,10 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	xwl_windowparams_t p;
 	precache_file_t * file;
 	char log_path[ MAX_PATH_SIZE ];
+
+#if !PRECACHE_TEST
 	char temp_path[ MAX_PATH_SIZE ];
+#endif
 
 
 	timer_startup(&state.ts);

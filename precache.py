@@ -126,6 +126,7 @@ def add_file( fullpath, relative_path, filedata ):
 	filedata['path'] = relative_path
 	filedata['md5'] = md5_from_file(fullpath)
 	output['filelist'].append( filedata )
+	
 for root, dirs, files in os.walk( cfg['abs_deploy_path'] ):
 	for f in files:
 		path_ignored = False
@@ -162,6 +163,9 @@ if actions != None:
 			
 			filedata['flags'] = create_flags( arch_bit, get_platform_id(platform_string), run_bit )
 			relative_path = action['file'].replace("\\", "/")
+			fullpath = (cfg['abs_deploy_path'] + action['file']).replace("\\", "/")
+			
+			print( 'fullpath: %s' % fullpath )
 			add_file( fullpath, relative_path, filedata )
 			
 jsondata = json.dumps(output, indent=4, sort_keys=True)

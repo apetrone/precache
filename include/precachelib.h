@@ -49,11 +49,22 @@
 #define PRECACHE_ARCH_X86 1
 #define PRECACHE_ARCH_X64 2
 
+// indices of file flags
 enum
 {
+	// architecture type (see PRECACHE_ARCH_*)
 	PRECACHE_FILE_ARCH_BIT = 0,
+
+	// specific platform (see PRECACHE_PLATFORM)
 	PRECACHE_FILE_PLATFORM_BIT = 4,
+
+	// indicates this file will be executed after successful downloads
 	PRECACHE_FILE_EXECUTE_BIT = 8
+};
+
+enum PrecacheFlags
+{
+	PF_DOWNLOADED = 1
 };
 
 enum PrecacheState

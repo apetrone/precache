@@ -224,6 +224,7 @@ precache_file_t * precache_locate_next_file( precache_file_t * start )
 	{
 		// is this file platform agnostic?
 		platform_id = ((cur->extra_flags >> PRECACHE_FILE_PLATFORM_BIT) & 0x0F);
+		log_msg( "* LOC: platform_id=%i [PRECACHE_PLATFORM=%i]\n", platform_id, PRECACHE_PLATFORM );
 		if ( platform_id == 0 || platform_id == PRECACHE_PLATFORM )
 		{
 			// has this file been downloaded yet?
