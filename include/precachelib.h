@@ -14,13 +14,36 @@
 #define PRECACHE_STATE_ERROR 4
 
 
+#define XWL_DEBUG 0
+#define THREAD_DEBUG 0
+#define PARSE_DEBUG 0
+
+#if XWL_DEBUG
+	#define xwlPrintf log_msg
+#else
+	#define xwlPrintf //
+#endif
+
+#if THREAD_DEBUG
+	#define THREAD_MSG log_msg
+#else
+	#define THREAD_MSG //
+#endif
+
+#if PARSE_DEBUG
+	#define parse_msg log_msg
+#else
+	#define parse_msg //
+#endif
+
+
 #define KB_DIV 1024
 #define MB_DIV 1048576
 
 
 // define as > 0 to test rendering
 // define as 0 for normal operations
-#define PRECACHE_TEST 0
+#define PRECACHE_TEST 1
 
 
 

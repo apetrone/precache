@@ -6,17 +6,17 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 {
     precache_file_t * file;
     precache_parse_state_t * ps = (precache_parse_state_t*)ctx;
-    //printf( "JSON type: %i | %i\n", type, ps->flags );
+    parse_msg( "JSON type: %i | %i\n", type, ps->flags );
 
     switch( type )
     {
         case JSON_T_INTEGER:
-            //printf( "integer: %i\n", (int)value->vu.integer_value );
+            parse_msg( "integer: %i\n", (int)value->vu.integer_value );
             if (ps->flags == 0 )
             {
                 if (stricmp( ps->lastkey, "version" ) == 0 )
                 {
-                    //printf( "Version is: %i\n", (int)value->vu.integer_value );
+                    parse_msg( "Version is: %i\n", (int)value->vu.integer_value );
                 }
             }
             else if ( (ps->flags & 2) )
@@ -61,18 +61,17 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             break;
         case JSON_T_KEY:
             strncpy( ps->lastkey, value->vu.str.value, 127 );
-            //printf( "key: '%s', value = ", ps->lastkey );
+            parse_msg( "key: '%s', value = ", ps->lastkey );
 
             break;
 
         case JSON_T_STRING:
-            //printf( "string: '%s'\n", value->vu.str.value );
+            parse_msg( "string: '%s'\n", value->vu.str.value );
             if (ps->flags == 0 )
             {
                 if ( stricmp( ps->lastkey, "localpath" ) == 0 )
                 {
                     strncpy( ps->state->relativepath, value->vu.str.value, 127 );
-                    //printf( "Base is: %s\n", ps->state->base );
                 }
 				else if ( stricmp( ps->lastkey, "remotepath" ) == 0 )
 				{

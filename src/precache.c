@@ -620,6 +620,9 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
 #if !PRECACHE_TEST
 	char temp_path[ MAX_PATH_SIZE ];
+#else
+	char * buffer;
+	long bufferSize;
 #endif
 
 
@@ -783,10 +786,8 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	}
 #endif
 
-
-	strcpy( state.msg2, "This is an updated version." );
-
-	//strcpy( state.msg2, "Testing message two string..." );
+	buffer = allocate_file_buffer( "precache.list", &bufferSize );
+	precache_parse_listbuffer( &state.ps, buffer, bufferSize );
 #else
 	strcpy( state.msg, "Downloading precache.list..." );
 	mutex_create( &state.dl );
