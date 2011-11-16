@@ -118,7 +118,8 @@ typedef struct precache_file_s
 typedef struct precache_state_s
 {
     int state;
-    char base[ 128 ];
+    char relativepath[ 128 ]; // relative path to localpath where the files are stored
+	char relative_remote[128];
     char remotepath[ MAX_PATH_SIZE ]; // a full url to the base folder where this project resides
     char localpath[ MAX_PATH_SIZE ]; // an absolute path to the folder on the local machine where these files should be placed
     char precache_file[ MAX_PATH_SIZE ];

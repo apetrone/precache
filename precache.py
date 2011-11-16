@@ -77,7 +77,7 @@ ignores = None
 PRECACHE_FILE = 'precache.list'
 output = {}
 output['version'] = 1
-output['base'] = ''
+output['localpath'] = ''
 output['filelist'] = []
 
 cfg = {}
@@ -110,12 +110,16 @@ if file_exists( config_path ):
 		
 	cfg['abs_target_path'] = os.path.normpath( os.path.abspath( os.path.dirname( cmdline.config_file ) ) )
 	print( 'Absolute target path: %s' % cfg['abs_target_path'] )
-	cfg['abs_deploy_path'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['target_path']))
+	cfg['abs_deploy_path'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['deploysource']))
 	print( 'Absolute deploy path: %s' % cfg['abs_deploy_path'] )
 
-	output['base'] = cfg['basename']
-	if output['base'][0] is not '/':
-		output['base'] = '/' + output['base']
+	output['localpath'] = cfg['localpath']
+	if output['localpath'][0] is not '/':
+		output['localpath'] = '/' + output['localpath']
+
+	output['remotepath'] = cfg['remotepath']
+	if output['remotepath'][0] is not '/':
+		output['remotepath'] = '/' + output['remotepath']
 else:
 	print( 'Configuration %s not found' % config_path )
 

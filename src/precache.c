@@ -373,7 +373,7 @@ void process_downloads()
             if ( precache_parse_list( &state.ps ) )
             {
 				// cat the base path onto the binary directory...
-				strcat( state.ps.localpath, state.ps.base );
+				strcat( state.ps.localpath, state.ps.relativepath );
 				platform_conform_slashes( state.ps.localpath, MAX_PATH_SIZE );
 
                 // ensure this directory exists..

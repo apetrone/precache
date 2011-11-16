@@ -6,6 +6,7 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 {
     precache_file_t * file;
     precache_parse_state_t * ps = (precache_parse_state_t*)ctx;
+	const char * tmp;
     //printf( "JSON type: %i | %i\n", type, ps->flags );
 
     switch( type )
@@ -69,11 +70,22 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             //printf( "string: '%s'\n", value->vu.str.value );
             if (ps->flags == 0 )
             {
-                if ( stricmp( ps->lastkey, "base" ) == 0 )
+                if ( stricmp( ps->lastkey, "localpath" ) == 0 )
                 {
-                    strncpy( ps->state->base, value->vu.str.value, 127 );
+                    strncpy( ps->state->relativepath, value->vu.str.value, 127 );
                     //printf( "Base is: %s\n", ps->state->base );
                 }
+				else if ( stricmp( ps->lastkey, "remotepath" ) == 0 )
+				{
+					tmp = value->vu.str.value;
+
+					// ensure a slash exists here
+					if ( tmp && (tmp[0] != '/' || tmp[0] != '\\' ) )
+					{
+						strcat( ps->state->remotepath, "/" );
+					}
+					strcat( ps->state->remotepath, value->vu.str.value );
+				}
             }
             else if ( ps->flags & 2 )
             {
