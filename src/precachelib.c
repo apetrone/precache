@@ -6,7 +6,6 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 {
     precache_file_t * file;
     precache_parse_state_t * ps = (precache_parse_state_t*)ctx;
-	const char * tmp;
     //printf( "JSON type: %i | %i\n", type, ps->flags );
 
     switch( type )
@@ -77,13 +76,6 @@ int parse_json( void *ctx, int type, const JSON_value * value )
                 }
 				else if ( stricmp( ps->lastkey, "remotepath" ) == 0 )
 				{
-					tmp = value->vu.str.value;
-
-					// ensure a slash exists here
-					if ( tmp && (tmp[0] != '/' || tmp[0] != '\\' ) )
-					{
-						strcat( ps->state->remotepath, "/" );
-					}
 					strcat( ps->state->remotepath, value->vu.str.value );
 				}
             }
@@ -336,3 +328,12 @@ void md5_from_path( const char * filename, char * digest )
         sprintf( digest + (loop * 2), "%02x", md5digest[loop] );
     }
 } // md5_from_path
+
+
+void precache_sanitize_path( char * path )
+{
+	size_t len = strlen(path);
+
+	if ( path[ len-1 ] == '/' || path[ len-1 ] == '\\' )
+		path[ len-1 ] = '\0';
+} // precache_sanitize_path

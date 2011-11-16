@@ -23,6 +23,22 @@
 #define PRECACHE_TEST 0
 
 
+
+/*
+Example: precache.conf
+/////////////////////////////////////////////
+
+{
+	"deploysource" : "test",
+	"localpath" : "folder",
+	"remotepath" : "test"
+}
+
+/////////////////////////////////////////////
+*/
+
+
+
 #if _WIN32
     #define MAX_PATH_SIZE MAX_PATH
     #define PATH_SEPARATOR '\\'
@@ -153,3 +169,6 @@ void md5_from_path( const char * filename, char * digest );
 int precache_parse_list( precache_state_t * precache );
 precache_file_t * precache_locate_next_file( precache_file_t * start );
 precache_file_t * precache_locate_executable_file( precache_file_t * start );
+
+// make sure the path has no trailing slashes
+void precache_sanitize_path( char * path );

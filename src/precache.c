@@ -680,6 +680,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
     // the directory which contains the precache.list
 	strcpy( state.ps.remotepath, PRECACHE_URL );
+	precache_sanitize_path( state.ps.remotepath );
 
 	platform_operating_directory( state.ps.localpath, MAX_PATH_SIZE );
 
@@ -771,6 +772,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 #if PRECACHE_TEST
 	strcpy( state.msg, "PRECACHE_TEST is enabled..." );
 
+#if 0
 	if ( platform_is64bit() )
 	{
 		strcpy( state.msg2, "x86_64 OS detected." );
@@ -779,6 +781,11 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	{
 		strcpy( state.msg2, "x86 OS detected." );
 	}
+#endif
+
+
+	strcpy( state.msg2, "This is an updated version." );
+
 	//strcpy( state.msg2, "Testing message two string..." );
 #else
 	strcpy( state.msg, "Downloading precache.list..." );
@@ -847,7 +854,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	thread_stop( &state.t0 );
 
 	// cleanup the precache list from the filesystem...
-	unlink( state.ps.precache_file );
+	//unlink( state.ps.precache_file );
 
 	log_msg( "* Shutting down gracefully.\n" );
 
