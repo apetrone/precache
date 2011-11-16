@@ -155,7 +155,10 @@ if actions != None:
 		for action in platform_actions:
 			
 			filedata = {}
-			filedata['target'] = action['target']		
+			filedata['target'] = action['file']
+			
+			if 'target' in action:
+				filedata['target'] = action['target']		
 			
 			run_bit = 0
 			if 'run' in action:
