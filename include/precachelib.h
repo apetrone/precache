@@ -167,8 +167,13 @@ typedef char md5_digest_t[ 33 ];
 
 void md5_from_path( const char * filename, char * digest );
 int precache_parse_list( precache_state_t * precache );
+int precache_parse_listbuffer( precache_state_t * precache, char * buffer, int bufferSize );
+
 precache_file_t * precache_locate_next_file( precache_file_t * start );
 precache_file_t * precache_locate_executable_file( precache_file_t * start );
 
 // make sure the path has no trailing slashes
 void precache_sanitize_path( char * path );
+
+// allocate an array to hold the size of the file at path; must be free'd
+char * allocate_file_buffer( const char * path, long * fileSize );

@@ -104,46 +104,15 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 } // print
 
 
-
-int precache_parse_list( precache_state_t * precache )
+int precache_parse_listbuffer( precache_state_t * precache, char * buffer, int bufferSize )
 {
-    char absolute_path[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
-    JSON_config config;
-    int i;
-    int result = 1;
-    struct JSON_parser_struct * jc = 0;
-    FILE * fp;
-    long fileSize;
-    char * buffer;
+	int result = 1;
+	JSON_config config;
+	int i;
     int linenumber;
     int colnumber;
-	precache_file_t * file;
-    precache_parse_state_t pstate;
-
-    // construct absolute path to precache list...
-    strcpy( absolute_path, precache->localpath );
-    strcat( absolute_path, precache->curfile->path );
-
-	platform_conform_slashes( absolute_path, PRECACHE_TEMP_BUFFER_SIZE );
-    log_msg( "* precache.list file: %s\n", absolute_path );
-
-    fp = fopen( absolute_path, "rb" );
-
-    if ( !fp )
-        return 0;
-
-    fseek( fp, 0, SEEK_END );
-    fileSize = ftell( fp );
-    fseek( fp, 0, 0 );
-
-    // don't allocate more than X bytes for the buffer. Warn the user?
-
-    // allocate memory for the buffer
-    buffer = (char*)malloc( fileSize+1 );
-    memset( buffer, 0, fileSize+1 );
-
-    fread( buffer, fileSize, 1, fp );
-    fclose( fp );
+	precache_parse_state_t pstate;
+    struct JSON_parser_struct * jc = 0;
 
     // setup precache internal parser state
     pstate.state = precache;
@@ -165,7 +134,7 @@ int precache_parse_list( precache_state_t * precache )
     colnumber = 0;
 
     // throw the buffer in the parser
-    for( i = 0; i < fileSize; ++i )
+    for( i = 0; i < bufferSize; ++i )
     {
         if ( buffer[i] == '\n' )
         {
@@ -194,11 +163,36 @@ int precache_parse_list( precache_state_t * precache )
     // cleanup resources
     delete_JSON_parser(jc);
 
-    if ( buffer )
-    {
-        free( buffer );
-    }
+	return result;
+}
 
+int precache_parse_list( precache_state_t * precache )
+{
+    char absolute_path[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
+    int result = 1;
+    long fileSize;
+    char * buffer;
+	precache_file_t * file;
+    
+
+    // construct absolute path to precache list...
+    strcpy( absolute_path, precache->localpath );
+    strcat( absolute_path, precache->curfile->path );
+
+	platform_conform_slashes( absolute_path, PRECACHE_TEMP_BUFFER_SIZE );
+    log_msg( "* precache.list file: %s\n", absolute_path );
+
+	buffer = allocate_file_buffer( absolute_path, &fileSize );
+
+	if ( buffer )
+	{
+		result = precache_parse_listbuffer( precache, buffer, fileSize );
+		free( buffer );
+	}
+	else
+	{
+		log_msg( "* error allocating file buffer for (%s)\n", absolute_path );
+	}
 
 	// go through each file and make sure targetpath has a valid path
 	file = precache->files;
@@ -312,7 +306,7 @@ void md5_from_path( const char * filename, char * digest )
     fread( data, 1, fileSize, fp );
 
     // add all bytes from the file
-    md5_append( &md5state, (unsigned char*)data, fileSize );
+    md5_append( &md5state, (unsigned char*)data, (int)fileSize );
 
     // close the file
     fclose( fp );
@@ -337,3 +331,33 @@ void precache_sanitize_path( char * path )
 	if ( path[ len-1 ] == '/' || path[ len-1 ] == '\\' )
 		path[ len-1 ] = '\0';
 } // precache_sanitize_path
+
+
+char * allocate_file_buffer( const char * path, long * fileSize )
+{
+	char * buffer;
+	FILE * fp;
+
+	// open the file
+    fp = fopen( path, "rb" );
+
+    if ( !fp )
+        return 0;
+
+	// seek to the end of the file and get the file size
+    fseek( fp, 0, SEEK_END );
+    *fileSize = ftell( fp );
+    fseek( fp, 0, 0 );
+
+    // allocate memory for the buffer
+    buffer = (char*)malloc( (*fileSize)+1 );
+    memset( buffer, 0, (*fileSize)+1 );
+
+	// read file into buffer
+    fread( buffer, (*fileSize), 1, fp );
+
+	// close file
+    fclose( fp );
+
+	return buffer;
+}
