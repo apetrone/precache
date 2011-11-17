@@ -2,6 +2,7 @@
 #include "platform.h"
 #include "log.h"
 
+
 int parse_json( void *ctx, int type, const JSON_value * value )
 {
     precache_file_t * file;
@@ -12,14 +13,14 @@ int parse_json( void *ctx, int type, const JSON_value * value )
     {
         case JSON_T_INTEGER:
             parse_msg( "integer: %i\n", (int)value->vu.integer_value );
-            if (ps->flags == 0 )
+            if (ps->flags == JPS_NONE )
             {
                 if (stricmp( ps->lastkey, "version" ) == 0 )
                 {
                     parse_msg( "Version is: %i\n", (int)value->vu.integer_value );
                 }
             }
-            else if ( (ps->flags & 2) )
+            else if ( (ps->flags & JPS_FILE) )
             {
 				if ( ps->state->curfile )
 				{
@@ -31,43 +32,76 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             }
             break;
         case JSON_T_ARRAY_BEGIN:
-            ps->flags |= 1;
+			parse_msg( "JSON_T_ARRAY_BEGIN\n" );
+			if ( ps->lastkey )
+			{
+				if ( stricmp( ps->lastkey, "filelist" ) == 0 )
+				{
+					ps->flags |= JPS_FILELIST;
+				}
+				else if ( stricmp( ps->lastkey, "updatelist" ) == 0 )
+				{
+					ps->flags |= JPS_UPDATERLIST;
+				}
+			}
+
             // start reading files
             break;
         case JSON_T_ARRAY_END:
-            ps->flags &= ~1;
+			parse_msg( "JSON_T_ARRAY_END\n" );
+			if ( ps->flags & JPS_FILELIST )
+			{
+				ps->flags &= ~JPS_FILELIST;
+				ps->flags &= ~JPS_FILE;
+			}
+			else if ( ps->flags & JPS_UPDATERLIST )
+			{
+				ps->flags &= ~JPS_UPDATERLIST;
+				ps->flags &= ~JPS_FILE;
+			}
             // stopped reading files
             break;
         case JSON_T_OBJECT_BEGIN:
-            if ( (ps->flags & 1) )
+			parse_msg( "JSON_T_OBJECT_BEGIN\n" );
+
+            ps->flags |= JPS_FILE;
+            // allocate a new file and link it in
+            file = (precache_file_t*)malloc( sizeof(precache_file_t) );
+            memset( file, 0, sizeof(precache_file_t) );
+            
+            file->flags = 0;
+			file->extra_flags = 0;
+			memset( file->targetpath, 0, MAX_PATH_SIZE );
+			memset( file->path, 0, MAX_PATH_SIZE );
+
+            if ( (ps->flags & JPS_FILELIST) )
             {
-                ps->flags |= 2;
-                // allocate a new file and link it in
-                file = (precache_file_t*)malloc( sizeof(precache_file_t) );
-                memset( file, 0, sizeof(precache_file_t) );
-                file->next = ps->state->files;
-                file->flags = 0;
-				file->extra_flags = 0;
-				memset( file->targetpath, 0, MAX_PATH_SIZE );
-				memset( file->path, 0, MAX_PATH_SIZE );
+				file->next = ps->state->files;
                 ps->state->files = file;
                 ps->state->curfile = file;
             }
+			else if ( ps->flags & JPS_UPDATERLIST )
+			{
+				file->next = ps->state->updatelist;
+				ps->state->updatelist = file;
+				ps->state->curfile = file;
+			}
 
             break;
         case JSON_T_OBJECT_END:
-            if ( (ps->flags & 1) )
-                ps->flags &= ~2;
+			parse_msg( "JSON_T_OBJECT_END\n" );
+            if ( (ps->flags & JPS_FILELIST) )
+                ps->flags &= ~JPS_FILE;
             break;
         case JSON_T_KEY:
             strncpy( ps->lastkey, value->vu.str.value, 127 );
-            parse_msg( "key: '%s', value = ", ps->lastkey );
+            parse_msg( "key: '%s', value = '%s'\n", ps->lastkey );
 
             break;
 
         case JSON_T_STRING:
             parse_msg( "string: '%s'\n", value->vu.str.value );
-            if (ps->flags == 0 )
+            if (ps->flags == JPS_NONE )
             {
                 if ( stricmp( ps->lastkey, "localpath" ) == 0 )
                 {
@@ -78,7 +112,7 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 					strcat( ps->state->remotepath, value->vu.str.value );
 				}
             }
-            else if ( ps->flags & 2 )
+            else if ( ps->flags & JPS_FILE )
             {
 				if ( ps->state->curfile )
 				{
@@ -360,3 +394,18 @@ char * allocate_file_buffer( const char * path, long * fileSize )
 
 	return buffer;
 }
+
+int precache_should_update_self( precache_state_t * precache )
+{
+	int result = 0;
+
+	if ( precache->updatelist )
+	{
+		log_msg( "* Updatelist items are present in the file...\n" );
+	}
+
+
+
+
+	return result;
+} // precache_should_update_self

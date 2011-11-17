@@ -12,11 +12,16 @@
 #define PRECACHE_STATE_DOWNLOAD 2 // downloading a file
 #define PRECACHE_STATE_EXIT 3
 #define PRECACHE_STATE_ERROR 4
+#define KB_DIV 1024
+#define MB_DIV 1048576
 
+// define as > 0 to testing
+// define as 0 for normal operations
+#define PRECACHE_TEST 1
 
 #define XWL_DEBUG 0
 #define THREAD_DEBUG 0
-#define PARSE_DEBUG 0
+#define PARSE_DEBUG 1
 
 #if XWL_DEBUG
 	#define xwlPrintf log_msg
@@ -37,13 +42,6 @@
 #endif
 
 
-#define KB_DIV 1024
-#define MB_DIV 1048576
-
-
-// define as > 0 to test rendering
-// define as 0 for normal operations
-#define PRECACHE_TEST 1
 
 
 
@@ -106,6 +104,15 @@ enum PrecacheFlags
 	PF_DOWNLOADED = 1
 };
 
+
+enum json_parse_state
+{
+	JPS_NONE		= 0,
+	JPS_FILELIST	= 1,
+	JPS_FILE		= 2,
+	JPS_UPDATERLIST	= 4,
+};
+
 enum PrecacheState
 {
 	// an invalid state (at startup)
@@ -139,7 +146,10 @@ enum PrecacheState
 	PS_DOWNLOADING,
 
 	// operations completed successfully
-	PS_COMPLETED
+	PS_COMPLETED,
+
+	// precache needs to update itself
+	PS_UPDATE_SELF,
 };
 
 typedef struct precache_file_s
@@ -168,6 +178,9 @@ typedef struct precache_state_s
 
     precache_file_t * files;
     precache_file_t * curfile;
+
+	// files that are flagged in the updatelist
+	precache_file_t * updatelist;
 } precache_state_t;
 
 typedef struct precache_parse_state_s
@@ -200,3 +213,6 @@ void precache_sanitize_path( char * path );
 
 // allocate an array to hold the size of the file at path; must be free'd
 char * allocate_file_buffer( const char * path, long * fileSize );
+
+// determine if precache needs to update itself
+int precache_should_update_self( precache_state_t * precache );

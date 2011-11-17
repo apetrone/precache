@@ -396,16 +396,24 @@ void process_downloads()
 				
 				platform_makedirs( state.ps.localpath );
 
-				strcpy( state.msg, "Calculating MD5 checksums..." );
-				strcpy( state.msg2, "(this may take a while)" );
+				// check and see if we need to update our self
+				if ( precache_should_update_self( &state.ps ) )
+				{
+					state.ps.state = PS_UPDATE_SELF;
+				}
+				else
+				{
 
-				THREAD_MSG( "* THREAD: Initiating thread calculate checksums.\n" );
+					strcpy( state.msg, "Calculating MD5 checksums..." );
+					strcpy( state.msg2, "(this may take a while)" );
 
-				// fire up a task thread to determine what needs to be downloaded...
-				state.ps.state = PS_CALCULATING_CHECKSUMS;
-				thread_stop( &state.t0 );
-				thread_start( &state.t0, precache_calculate_checksums, &state.tdata );
-				
+					THREAD_MSG( "* THREAD: Initiating thread calculate checksums.\n" );
+
+					// fire up a task thread to determine what needs to be downloaded...
+					state.ps.state = PS_CALCULATING_CHECKSUMS;
+					thread_stop( &state.t0 );
+					thread_start( &state.t0, precache_calculate_checksums, &state.tdata );
+				}
             }
             else
             {
@@ -788,6 +796,10 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
 	buffer = allocate_file_buffer( "precache.list", &bufferSize );
 	precache_parse_listbuffer( &state.ps, buffer, bufferSize );
+	if ( buffer )
+	{
+		free( buffer );
+	}
 #else
 	strcpy( state.msg, "Downloading precache.list..." );
 	mutex_create( &state.dl );
@@ -831,6 +843,10 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
 			log_msg( "* Spawn process.\n" );
 			platform_spawn_process( temp_path );
+		}
+		else
+		{
+			log_msg( "* No executable file found in precache.list\n" );
 		}
 	}
 
