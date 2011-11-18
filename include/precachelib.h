@@ -17,11 +17,11 @@
 
 // define as > 0 to testing
 // define as 0 for normal operations
-#define PRECACHE_TEST 1
+#define PRECACHE_TEST 0
 
 #define XWL_DEBUG 0
 #define THREAD_DEBUG 0
-#define PARSE_DEBUG 1
+#define PARSE_DEBUG 0
 
 #if XWL_DEBUG
 	#define xwlPrintf log_msg
@@ -42,8 +42,16 @@
 #endif
 
 
-
-
+// parser constants
+#define PRECACHE_LIST_REMOTE_PROJECT_PATH "remote_project_path"
+#define PRECACHE_LIST_INSTALL_PATH "install_path"
+#define PRECACHE_LIST_VERSION "version"
+#define PRECACHE_LIST_MD5 "md5"
+#define PRECACHE_LIST_TARGET "target"
+#define PRECACHE_LIST_PATH "path"
+#define PRECACHE_LIST_FLAGS "flags"
+#define PRECACHE_LIST_FILELIST "filelist"
+#define PRECACHE_LIST_UPDATELIST "updaters"
 
 /*
 Example: precache.conf
@@ -168,7 +176,6 @@ typedef struct precache_state_s
 {
     int state;
     char relativepath[ 128 ]; // relative path to localpath where the files are stored
-	char relative_remote[128];
     char remotepath[ MAX_PATH_SIZE ]; // a full url to the base folder where this project resides
     char localpath[ MAX_PATH_SIZE ]; // an absolute path to the folder on the local machine where these files should be placed
     char precache_file[ MAX_PATH_SIZE ];

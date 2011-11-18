@@ -15,7 +15,7 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             parse_msg( "integer: %i\n", (int)value->vu.integer_value );
             if (ps->flags == JPS_NONE )
             {
-                if (stricmp( ps->lastkey, "version" ) == 0 )
+                if (stricmp( ps->lastkey, PRECACHE_LIST_VERSION ) == 0 )
                 {
                     parse_msg( "Version is: %i\n", (int)value->vu.integer_value );
                 }
@@ -24,7 +24,7 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             {
 				if ( ps->state->curfile )
 				{
-					if ( stricmp( ps->lastkey, "flags" ) == 0 )
+					if ( stricmp( ps->lastkey, PRECACHE_LIST_FLAGS ) == 0 )
 					{
 						ps->state->curfile->extra_flags = (int)value->vu.integer_value;
 					}
@@ -35,11 +35,11 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 			parse_msg( "JSON_T_ARRAY_BEGIN\n" );
 			if ( ps->lastkey )
 			{
-				if ( stricmp( ps->lastkey, "filelist" ) == 0 )
+				if ( stricmp( ps->lastkey, PRECACHE_LIST_FILELIST ) == 0 )
 				{
 					ps->flags |= JPS_FILELIST;
 				}
-				else if ( stricmp( ps->lastkey, "updatelist" ) == 0 )
+				else if ( stricmp( ps->lastkey, PRECACHE_LIST_UPDATELIST ) == 0 )
 				{
 					ps->flags |= JPS_UPDATERLIST;
 				}
@@ -103,11 +103,11 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             parse_msg( "string: '%s'\n", value->vu.str.value );
             if (ps->flags == JPS_NONE )
             {
-                if ( stricmp( ps->lastkey, "localpath" ) == 0 )
+				if ( stricmp( ps->lastkey, PRECACHE_LIST_INSTALL_PATH ) == 0 )
                 {
                     strncpy( ps->state->relativepath, value->vu.str.value, 127 );
                 }
-				else if ( stricmp( ps->lastkey, "remotepath" ) == 0 )
+				else if ( stricmp( ps->lastkey, PRECACHE_LIST_REMOTE_PROJECT_PATH ) == 0 )
 				{
 					strcat( ps->state->remotepath, value->vu.str.value );
 				}
@@ -116,15 +116,15 @@ int parse_json( void *ctx, int type, const JSON_value * value )
             {
 				if ( ps->state->curfile )
 				{
-					if ( stricmp( ps->lastkey, "path" ) == 0 )
+					if ( stricmp( ps->lastkey, PRECACHE_LIST_PATH ) == 0 )
 					{
 						strncpy( ps->state->curfile->path, value->vu.str.value, MAX_PATH_SIZE-1 );
 					}
-					else if ( stricmp( ps->lastkey, "target" ) == 0 )
+					else if ( stricmp( ps->lastkey, PRECACHE_LIST_TARGET ) == 0 )
 					{
 						strncpy( ps->state->curfile->targetpath, value->vu.str.value, MAX_PATH_SIZE-1 );
 					}
-					else if ( stricmp( ps->lastkey, "md5" ) == 0 )
+					else if ( stricmp( ps->lastkey, PRECACHE_LIST_MD5 ) == 0 )
 					{
 						strncpy( ps->state->curfile->checksum, value->vu.str.value, 32 );
 					}
