@@ -1,78 +1,13 @@
 import os
 import sys
-import hashlib
+
 import json
-import re
+
 import argparse
 import fnmatch
 
-from utils import get_platform, file_exists, load_config
+from utils import get_platform, get_platform_id, get_arch_id, file_exists, load_config, ignores_to_regex, md5_from_file, create_flags, make_relative_to
 
-PRECACHE_FILE_ARCH_BIT = 0
-PRECACHE_FILE_PLATFORM_BIT = 4
-PRECACHE_FILE_EXECUTE_BIT = 8
-
-# determine platform id
-# NOTE: These values MUST match the same values in the precachelib.h
-def get_platform_id( pstring ):
-	if pstring == "windows":
-		return 1
-	elif pstring == "linux":
-		return 2
-	elif pstring == "macosx":
-		return 3
-	return None
-	
-# determine architecture id
-def get_arch_id( arch ):
-	if arch == "x86":
-		return 1
-	elif arch == "x64":
-		return 2
-	return None
-
-# condense these ids into a single value
-def create_flags( arch_id, os_id, binary ):
-	return (int(arch_id) << PRECACHE_FILE_ARCH_BIT | int(os_id) << PRECACHE_FILE_PLATFORM_BIT | int(binary) << PRECACHE_FILE_EXECUTE_BIT)	
-	
-#
-# functions
-def make_relative_to( inpath, relpath ):
-	if relpath in inpath:
-		return inpath[ len(relpath): ]
-	else:
-		print( 'relpath NOT in inpath' )
-		print( '%s <-> %s' % (relpath, inpath) )
-	
-def md5_from_file( file ):
-	hash = ''
-	block_size = 8192
-	m = hashlib.md5()
-	
-	f = open( file, "rb" )
-	
-	while True:
-		data = f.read( block_size )
-		if not data:
-			break
-		m.update(data)
-	
-	f.close()
-	
-	
-	return m.hexdigest()
-
-
-CONFIG_FILE = 'precache.conf'
-
-
-p = argparse.ArgumentParser( description='Generate precache.list for a project' )
-#p.add_argument( '-t', '--target', dest='target_path', metavar='TARGET_PATH', required=True )
-#p.add_argument( '-o', '--output', dest='output_file', metavar='OUTPUT_FILE', required=True )
-p.add_argument( '-f', '--file', dest='config_file', metavar='CONFIG_FILE', required=True )
-
-
-cmdline = p.parse_args()
 
 ignores = None
 
@@ -86,19 +21,16 @@ cfg = {}
 ignore_list = []
 actions = None
 updaters = None
+
+if __name__ == "__main__":
+	p = argparse.ArgumentParser( description='Generate precache.list for a project' )
+	p.add_argument( '-f', '--file', dest='config_file', metavar='CONFIG_FILE', required=True )
+	cmdline = p.parse_args()
+
 config_path = os.path.normpath( cmdline.config_file )
 
 
-def ignores_to_regex( excludes ):
-	ignore_list = []
-	for e in excludes:
-		e = os.path.normpath( e )
-		e = e.replace('\\', '\\\\')
-		e = e.replace('.', '\\.')
-		e = e.replace('*', '.*')
-		pat = re.compile( e )
-		ignore_list.append( pat )
-	return ignore_list
+
 
 if file_exists( config_path ):
 	print( 'Loading configuration from %s...' % config_path )
@@ -110,11 +42,11 @@ if file_exists( config_path ):
 	cfg['abs_deploy_path'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['local_project_path']))
 	print( 'Absolute deploy path: %s' % cfg['abs_deploy_path'] )	
 	
-	excludes = []
-	if 'excludes' in cfg:
-		excludes = cfg['excludes']
-		
-	ignore_list = ignores_to_regex( excludes )
+	
+	
+	
+	# convert excludes
+	ignore_list = ignores_to_regex( cfg['excludes'] )
 		
 	actions = []
 	if 'actions' in cfg:
@@ -177,7 +109,10 @@ if actions != None:
 	for platform_string in actions:
 		platform_actions = actions[ platform_string ]
 		for action in platform_actions:
-			
+			if 'file' not in action:
+				print( 'ERROR: file key is not in action [%s]' % action )
+				continue
+				
 			filedata = {}
 			filedata['target'] = action['file']
 			
