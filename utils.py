@@ -3,12 +3,13 @@ import platform
 import json
 import sys
 import re
-import hashlib	
+import hashlib
+import stat
 
 # NOTE: These values MUST match the same values in the precachelib.h
 PRECACHE_FILE_ARCH_BIT = 0
 PRECACHE_FILE_PLATFORM_BIT = 4
-PRECACHE_FILE_EXECUTE_BIT = 8
+PRECACHE_FILE_DEFAULT_MODE = '666'
 
 # -----------------------------------------------------------------------------
 # Utils
@@ -119,9 +120,9 @@ def get_arch_id( arch ):
 
 
 
-def create_flags( arch_id, os_id, binary ):
+def create_flags( arch_id, os_id ):
 	""" condense these ids into a single value """
-	return (int(arch_id) << PRECACHE_FILE_ARCH_BIT | int(os_id) << PRECACHE_FILE_PLATFORM_BIT | int(binary) << PRECACHE_FILE_EXECUTE_BIT)	
+	return (int(arch_id) << PRECACHE_FILE_ARCH_BIT | int(os_id) << PRECACHE_FILE_PLATFORM_BIT)	
 
 
 def make_relative_to( inpath, relpath ):
@@ -131,3 +132,35 @@ def make_relative_to( inpath, relpath ):
 	else:
 		print( 'relpath NOT in inpath' )
 		print( '%s <-> %s' % (relpath, inpath) )
+		
+def default_file_mode():
+	return PRECACHE_FILE_DEFAULT_MODE
+	
+def get_mode_for_file( fullpath ):
+	mode = os.stat( fullpath ).st_mode
+	owner = 0
+	group = 0
+	other = 0
+	if mode & stat.S_IRUSR:
+		owner |= 4
+	if mode & stat.S_IWUSR:
+		owner |= 2
+	if mode & stat.S_IXUSR:
+		owner |= 1
+	
+	if mode & stat.S_IRGRP:
+		group |= 4
+	if mode & stat.S_IWGRP:
+		group |= 2
+	if mode & stat.S_IXGRP:
+		group |= 1
+	
+	if mode & stat.S_IROTH:
+		other |= 4
+	if mode & stat.S_IWOTH:
+		other |= 2
+	if mode & stat.S_IXOTH:
+		other |= 1	
+	
+	chmod = ('%s%s%s' % (owner, group, other))
+	return chmod

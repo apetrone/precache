@@ -7,6 +7,7 @@
 
 #define PRECACHE_USER_AGENT "precache-downloader"
 #define PRECACHE_TIMEOUT_MS 3000
+#define PRECACHE_DEFAULT_FILE_PERMISSIONS "666"
 #define PRECACHE_TEMP_BUFFER_SIZE 512
 #define PRECACHE_STATE_DOWNLOAD_REQUEST 1 // request to download a file
 #define PRECACHE_STATE_DOWNLOAD 2 // downloading a file
@@ -52,6 +53,7 @@
 #define PRECACHE_LIST_FLAGS "flags"
 #define PRECACHE_LIST_FILELIST "filelist"
 #define PRECACHE_LIST_UPDATELIST "updaters"
+#define PRECACHE_LIST_CHMOD "mode"
 
 /*
 Example: precache.conf
@@ -168,6 +170,7 @@ typedef struct precache_file_s
     int flags;
 	short extra_flags;
 	float timestamp;
+	int mode;
 
     struct precache_file_s * next;
 } precache_file_t;
@@ -223,3 +226,8 @@ char * allocate_file_buffer( const char * path, long * fileSize );
 
 // determine if precache needs to update itself
 int precache_should_update_self( precache_state_t * precache );
+
+#if LINUX || __APPLE__
+// convert a string of characters (chmod) to integer flags
+int precache_mode_string_to_integer( const char * mode );
+#endif

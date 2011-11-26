@@ -87,6 +87,10 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 				ps->state->curfile = file;
 			}
 
+#if LINUX || __APPLE__
+			file->mode = precache_mode_string_to_integer( PRECACHE_DEFAULT_FILE_PERMISSIONS );
+#endif
+
             break;
         case JSON_T_OBJECT_END:
 			parse_msg( "JSON_T_OBJECT_END\n" );
@@ -128,6 +132,14 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 					{
 						strncpy( ps->state->curfile->checksum, value->vu.str.value, 32 );
 					}
+
+					else if ( stricmp( ps->lastkey, PRECACHE_LIST_CHMOD ) == 0 )
+					{
+#if LINUX || __APPLE__
+						ps->state->curfile->mode = precache_mode_string_to_integer( value->vu.str.value );
+#endif
+					}
+
 				}
             }
             break;
@@ -409,3 +421,46 @@ int precache_should_update_self( precache_state_t * precache )
 
 	return result;
 } // precache_should_update_self
+
+#if LINUX || __APPLE__
+int precache_mode_string_to_integer( const char * mode )
+{
+	int value = 0;
+	char tmp;
+
+	// permissions for owner
+	tmp = mode[0] - '0';
+	if ( tmp & 4 )
+		value |= S_IRUSR;
+
+	if ( tmp & 2 )
+		value |= S_IWUSR;
+
+	if ( tmp & 1 )
+		value |= S_IXUSR;
+
+	// permissions for group
+	tmp = mode[1] - '0';
+	if ( tmp & 4 )
+		value |= S_IRGRP;
+
+	if ( tmp & 2 )
+		value |= S_IWGRP;
+
+	if ( tmp & 1 )
+		value |= S_IXGRP;
+
+	// permissions for others
+	tmp = mode[2] - '0';
+	if ( tmp & 4 )
+		value |= S_IROTH;
+
+	if ( tmp & 2 )
+		value |= S_IWOTH;
+
+	if ( tmp & 1 )
+		value |= S_IXOTH;
+
+	return value;
+} // precache_mode_string_to_integer
+#endif

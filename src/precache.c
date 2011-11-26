@@ -8,11 +8,13 @@
 	#include <gl/gl.h>
 	#pragma comment( lib, "opengl32.lib" )
 #elif __APPLE__
+	#include <errno.h>
 	#include <sys/stat.h> // for mkdir
 	#include <OpenGL/OpenGL.h>
 	#include <OpenGL/gl.h>
 #elif LINUX
 	#include <errno.h>
+	#include <sys/stat.h>
 	#include <sys/types.h>
 	#include <unistd.h>
 	#include <GL/gl.h>
@@ -203,6 +205,10 @@ THREAD_ENTRY precache_download_thread( void * data )
 	int last_bytes;
 	float last_read;
 
+#if LINUX || __APPLE__
+	int result;
+#endif
+
     if ( !td || !download || !precache )
         return 0;
 
@@ -275,6 +281,20 @@ THREAD_ENTRY precache_download_thread( void * data )
 				if ( download->completed )
 				{
 					THREAD_MSG( "-> T: %i - download complete!\n", thread_id );
+
+					// set permissions on this file
+					log_msg( "XYZ -> %s\n", precache->curfile->path );
+
+#if LINUX || __APPLE__
+					log_msg( "* Set permissions on file... (%i)\n", precache->curfile->mode );
+					result = chmod( localpath, precache->curfile->mode );
+
+					if ( result != 0 )
+					{
+						log_msg( "* chmod failed with errno: %i\n", errno );
+					}
+#endif
+
 				}
 				else
 				{
@@ -676,6 +696,9 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
     // add the first file - which is the precache.list
     state.ps.curfile = (precache_file_t*)malloc( sizeof(precache_file_t) );
+#if LINUX || __APPLE__
+	state.ps.curfile->mode = precache_mode_string_to_integer( PRECACHE_DEFAULT_FILE_PERMISSIONS );
+#endif
     state.ps.curfile->next = 0;
     memset( state.ps.curfile->checksum, 0, 33 );
     state.ps.curfile->flags = 0;
@@ -837,9 +860,6 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 			platform_conform_slashes( temp_path, MAX_PATH_SIZE );
 			
 			log_msg( "* Executable file is [%s]\n", temp_path );
-
-			log_msg( "* Set permissions on file...\n" );
-
 
 			log_msg( "* Spawn process.\n" );
 			platform_spawn_process( temp_path );

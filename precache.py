@@ -6,7 +6,7 @@ import json
 import argparse
 import fnmatch
 
-from utils import get_platform, get_platform_id, get_arch_id, file_exists, load_config, ignores_to_regex, md5_from_file, create_flags, make_relative_to
+from utils import get_platform, get_platform_id, get_arch_id, get_mode_for_file, file_exists, load_config, ignores_to_regex, md5_from_file, create_flags, make_relative_to, default_file_mode
 
 
 ignores = None
@@ -100,9 +100,15 @@ for root, dirs, files in os.walk( cfg['abs_deploy_path'] ):
 				break
 		
 		if not path_ignored:
+			filedata = {}
+			chmod = get_mode_for_file( fullpath )
+			print( fullpath )
+			print( 'Permissions %s' % (chmod) )
+			if chmod != default_file_mode():
+				filedata['mode'] = chmod
 			relative_path = make_relative_to( fullpath, cfg['abs_deploy_path'] )
 			relative_path = relative_path.replace("\\", "/")
-			add_file( fullpath, relative_path, {} )
+			add_file( fullpath, relative_path, filedata )
 
 # take care of platform-specific files
 if actions != None:
@@ -118,16 +124,18 @@ if actions != None:
 			
 			if 'target' in action:
 				filedata['target'] = action['target']		
-			
-			run_bit = 0
-			if 'run' in action:
-				run_bit = action['run']
-				
+
 			arch_bit = 0
 			if 'arch' in action:
 				arch_bit = get_arch_id( action['arch'] )
 			
-			filedata['flags'] = create_flags( arch_bit, get_platform_id(platform_string), run_bit )
+			print( fullpath )
+			chmod = get_mode_for_file( fullpath )
+			print( 'Permissions %s' % (chmod) )
+			if chmod != default_file_mode():
+				filedata['mode'] = chmod	
+			
+			filedata['flags'] = create_flags( arch_bit, get_platform_id(platform_string) )
 			relative_path = action['file'].replace("\\", "/")
 			fullpath = (cfg['abs_deploy_path'] + action['file']).replace("\\", "/")
 			
@@ -176,16 +184,16 @@ if updaters != None and 'updater_path' in cfg:
 					relative_path = relative_path.replace( "\\", "/" )
 					print( relative_path )
 					
+
 					filedata = {}
 					arch_bit = 0
-					run_bit = 0
-					if in_runlist:
-						run_bit = 1
-						print( 'This file should be EXECUTABLE' )
-						
 					
+					chmod = get_mode_for_file( fullpath )
+					print( 'Permissions %s' % (chmod) )
+					if chmod != default_file_mode():
+						filedata['mode'] = chmod
 					filedata['target'] = relative_path
-					filedata['flags'] = create_flags( arch_bit, get_platform_id(platform_string), run_bit )					
+					filedata['flags'] = create_flags( arch_bit, get_platform_id(platform_string) )
 					
 					add_updater( fullpath, relative_path, filedata )
 
