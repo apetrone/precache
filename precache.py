@@ -19,7 +19,7 @@ output['filelist'] = []
 
 cfg = {}
 ignore_list = []
-actions = None
+
 updaters = None
 
 if __name__ == "__main__":
@@ -47,20 +47,21 @@ if file_exists( config_path ):
 	
 	# convert excludes
 	ignore_list = ignores_to_regex( cfg['excludes'] )
-		
-	actions = []
-	if 'actions' in cfg:
-		actions = cfg['actions']
 
-	if 'updaters' in cfg:
-		if 'updater_path' not in cfg:
-			print( 'ERROR: Missing updater_path in config.' )
-			sys.exit(1)
+	if 'binary_path' not in cfg:
+		print( 'ERROR: Missing binary_path in config.' )
+		sys.exit(1)
+		
+		
+	if 'updater_path' not in cfg:
+		print( 'ERROR: Missing updater_path in config.' )
+		sys.exit(1)
 			
 		updaters = cfg['updaters']
 		cfg['abs_updater_path'] = os.path.normpath( cfg['abs_target_path'] + '/' + cfg['updater_path'] )
 			
 
+			
 	output['install_path'] = cfg['install_path']
 	if output['install_path'][0] is not '/':
 		output['install_path'] = '/' + output['install_path']
@@ -86,61 +87,76 @@ def add_file( fullpath, relative_path, filedata ):
 def add_updater( fullpath, relative_path, filedata ):
 	filedata = add_file_data( fullpath, relative_path, filedata )
 	output['updaters'].append( filedata )
+
+
+def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=None, source_prefix=None ):
+	print( 'Traversing: %s' % source )
 	
-for root, dirs, files in os.walk( cfg['abs_deploy_path'] ):
-	for f in files:
-		path_ignored = False
-		fullpath = root + os.path.sep + f
-		
-		for i in ignore_list:
-			if i.match( fullpath ):
-				#print( 'MATCH: %s' % i.pattern )
-				#print( 'ignored: %s' % fullpath )
-				path_ignored=True
-				break
-		
-		if not path_ignored:
-			filedata = {}
-			chmod = get_mode_for_file( fullpath )
-			print( fullpath )
-			print( 'Permissions %s' % (chmod) )
-			if chmod != default_file_mode():
-				filedata['mode'] = chmod
-			relative_path = make_relative_to( fullpath, cfg['abs_deploy_path'] )
-			relative_path = relative_path.replace("\\", "/")
-			add_file( fullpath, relative_path, filedata )
-
-# take care of platform-specific files
-if actions != None:
-	for platform_string in actions:
-		platform_actions = actions[ platform_string ]
-		for action in platform_actions:
-			if 'file' not in action:
-				print( 'ERROR: file key is not in action [%s]' % action )
-				continue
+	for root, dirs, files in os.walk( source ):
+		for f in files:
+			path_ignored = False
+			fullpath = root + os.path.sep + f
+			
+			for i in ignore_list:
+				if i.match( fullpath ):
+					path_ignored=True
+					break
+			
+			if not path_ignored:
+				filedata = {}
+				chmod = get_mode_for_file( fullpath )
+				#print( fullpath )
+				#print( 'Permissions %s' % (chmod) )
+				if chmod != default_file_mode():
+					filedata['mode'] = chmod
+					
 				
-			filedata = {}
-			filedata['target'] = action['file']
-			
-			if 'target' in action:
-				filedata['target'] = action['target']		
+					
+				arch_bit = 0
+				if not arch_agnostic:
+					if 'x86' in fullpath:
+						arch_bit = get_arch_id( 'x86' )
+					elif 'x64' in fullpath:
+						arch_bit = get_arch_id( 'x64' )
+						
+				platform_id = 0
+				if current_platform != None:
+					platform_id = get_platform_id( current_platform )
+				
+				flags = create_flags( arch_bit, platform_id )
+				if flags > 0:
+					filedata['flags'] = flags
+				
+				relative_path = make_relative_to( fullpath, source)
+				relative_path = relative_path.replace("\\", "/")
+				
+				if source_prefix != None:
+					filedata['target'] = relative_path
+					relative_path = '/' + source_prefix + relative_path
 
-			arch_bit = 0
-			if 'arch' in action:
-				arch_bit = get_arch_id( action['arch'] )
+				add_file( fullpath, relative_path, filedata )
+
+
+def traverse_binaries( source, binary_path, platforms ):
+	abs_bin_path = os.path.normpath( source + '/' + binary_path )
+	for platform in platforms:
+		# the source folder to start from
+		binary_source = os.path.normpath( abs_bin_path + '/' + platform )
+		
+		# prefix to relative file path
+		source_prefix = binary_path + '/' + platform
+		traverse_files( binary_source, [], arch_agnostic=False, current_platform=platform, source_prefix=source_prefix )
+
 			
-			print( fullpath )
-			chmod = get_mode_for_file( fullpath )
-			print( 'Permissions %s' % (chmod) )
-			if chmod != default_file_mode():
-				filedata['mode'] = chmod	
+# content from main deploy path
+traverse_files( cfg['abs_deploy_path'], ignore_list )
+
+# binaries for each platform
+traverse_binaries( cfg['abs_deploy_path'], cfg['binary_path'], cfg['platforms'] )
+
 			
-			filedata['flags'] = create_flags( arch_bit, get_platform_id(platform_string) )
-			relative_path = action['file'].replace("\\", "/")
-			fullpath = (cfg['abs_deploy_path'] + action['file']).replace("\\", "/")
-			
-			print( 'fullpath: %s' % fullpath )
-			add_file( fullpath, relative_path, filedata )
+'''
+
 			
 if updaters != None and 'updater_path' in cfg:
 	output['updaters'] = []
@@ -196,7 +212,7 @@ if updaters != None and 'updater_path' in cfg:
 					filedata['flags'] = create_flags( arch_bit, get_platform_id(platform_string) )
 					
 					add_updater( fullpath, relative_path, filedata )
-
+'''
 jsondata = json.dumps(output, indent=4, sort_keys=True)
 
 print( 'Writing precache file: %s' % cfg['output_file'] )

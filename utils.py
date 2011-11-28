@@ -75,7 +75,10 @@ def load_config( file ):
 		exclude_list.append( ('*/%s/*' % d['precache_binary_path']) )
 		
 	if 'precache_launcher_path' in d:
-		exclude_list.append( ('*/%s/*' % d['precache_launcher_path']) )	
+		exclude_list.append( ('*/%s/*' % d['precache_launcher_path']) )
+		
+	if 'platforms' not in d:
+		d['platforms'] = [ get_platform() ]
 		
 	d['excludes'] = exclude_list
 	return d
@@ -130,8 +133,8 @@ def make_relative_to( inpath, relpath ):
 	if relpath in inpath:
 		return inpath[ len(relpath): ]
 	else:
-		print( 'relpath NOT in inpath' )
-		print( '%s <-> %s' % (relpath, inpath) )
+		print( 'relpath NOT in inpath:' )
+		print( '\t%s <-> %s' % (relpath, inpath) )
 		
 def default_file_mode():
 	return PRECACHE_FILE_DEFAULT_MODE
