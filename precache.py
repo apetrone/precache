@@ -39,8 +39,12 @@ if file_exists( config_path ):
 		
 	cfg['abs_target_path'] = os.path.normpath( os.path.abspath( os.path.dirname( cmdline.config_file ) ) )
 	print( 'Absolute target path: %s' % cfg['abs_target_path'] )
-	cfg['abs_deploy_path'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['local_project_path']))
-	print( 'Absolute deploy path: %s' % cfg['abs_deploy_path'] )	
+	
+	cfg['abs_deploy_base'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['local_project_path']))
+	cfg['abs_content_path'] = os.path.normpath( cfg['abs_deploy_base'] + '/' + cfg['content_path'] )
+	cfg['abs_updater_path'] = os.path.normpath( cfg['abs_deploy_base'] + '/' + cfg['updater_path'] )
+	
+	print( 'Absolute deploy path: %s' % cfg['abs_deploy_base'] )	
 	
 	
 	
@@ -152,10 +156,10 @@ def traverse_binaries( source, binary_path, platforms, ignore_list=[] ):
 content_ignore_list = ignore_list[:]
 binary_path_match = '*/%s/*' % cfg['binary_path']
 content_ignore_list.extend( ignores_to_regex( [ binary_path_match ] ) )
-traverse_files( cfg['abs_deploy_path'], content_ignore_list )
+traverse_files( cfg['abs_content_path'], content_ignore_list )
 
 # binaries for each platform
-traverse_binaries( cfg['abs_deploy_path'], cfg['binary_path'], cfg['platforms'], ignore_list )
+traverse_binaries( cfg['abs_deploy_base'], cfg['binary_path'], cfg['platforms'], ignore_list )
 
 			
 '''
