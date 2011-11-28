@@ -137,7 +137,7 @@ def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=No
 				add_file( fullpath, relative_path, filedata )
 
 
-def traverse_binaries( source, binary_path, platforms ):
+def traverse_binaries( source, binary_path, platforms, ignore_list=[] ):
 	abs_bin_path = os.path.normpath( source + '/' + binary_path )
 	for platform in platforms:
 		# the source folder to start from
@@ -145,14 +145,17 @@ def traverse_binaries( source, binary_path, platforms ):
 		
 		# prefix to relative file path
 		source_prefix = binary_path + '/' + platform
-		traverse_files( binary_source, [], arch_agnostic=False, current_platform=platform, source_prefix=source_prefix )
+		traverse_files( binary_source, ignore_list, arch_agnostic=False, current_platform=platform, source_prefix=source_prefix )
 
 			
 # content from main deploy path
-traverse_files( cfg['abs_deploy_path'], ignore_list )
+content_ignore_list = ignore_list[:]
+binary_path_match = '*/%s/*' % cfg['binary_path']
+content_ignore_list.extend( ignores_to_regex( [ binary_path_match ] ) )
+traverse_files( cfg['abs_deploy_path'], content_ignore_list )
 
 # binaries for each platform
-traverse_binaries( cfg['abs_deploy_path'], cfg['binary_path'], cfg['platforms'] )
+traverse_binaries( cfg['abs_deploy_path'], cfg['binary_path'], cfg['platforms'], ignore_list )
 
 			
 '''
