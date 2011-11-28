@@ -5,6 +5,7 @@ import json
 
 import argparse
 import fnmatch
+import posixpath
 
 from utils import get_platform, get_platform_id, get_arch_id, get_mode_for_file, file_exists, load_config, ignores_to_regex, md5_from_file, create_flags, make_relative_to, default_file_mode
 
@@ -42,8 +43,7 @@ if file_exists( config_path ):
 	
 	cfg['abs_deploy_base'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['local_project_path']))
 	cfg['abs_content_path'] = os.path.normpath( cfg['abs_deploy_base'] + '/' + cfg['content_path'] )
-	cfg['abs_updater_path'] = os.path.normpath( cfg['abs_deploy_base'] + '/' + cfg['updater_path'] )
-	
+
 	print( 'Absolute deploy path: %s' % cfg['abs_deploy_base'] )	
 	
 	
@@ -52,16 +52,20 @@ if file_exists( config_path ):
 	# convert excludes
 	ignore_list = ignores_to_regex( cfg['excludes'] )
 
-	if 'binary_path' not in cfg:
-		print( 'ERROR: Missing binary_path in config.' )
+	if 'content_path' not in cfg:
+		print( 'ERROR: content_path missing from config' )
 		sys.exit(1)
+	
+	if 'binary_source' not in cfg:
+		cfg['binary_source'] = cfg['content_path']
+	
+	if 'binary_target' not in cfg:
+		cfg['binary_target'] = cfg['binary_source']
 		
+	if cfg['binary_target'][0] != '/':
+		cfg['binary_target'] = '/' + cfg['binary_target']
 		
-	if 'updater_path' not in cfg:
-		print( 'ERROR: Missing updater_path in config.' )
-		sys.exit(1)
-			
-		updaters = cfg['updaters']
+	if 'updater_path' in cfg:
 		cfg['abs_updater_path'] = os.path.normpath( cfg['abs_target_path'] + '/' + cfg['updater_path'] )
 			
 
@@ -73,6 +77,10 @@ if file_exists( config_path ):
 	output['remote_project_path'] = cfg['remote_project_path']
 	if output['remote_project_path'][0] is not '/':
 		output['remote_project_path'] = '/' + output['remote_project_path']
+		
+		
+	if 'platforms' not in cfg:
+		cfg['platforms'] = [ get_platform() ]
 else:
 	print( 'Configuration %s not found' % config_path )
 
@@ -93,7 +101,7 @@ def add_updater( fullpath, relative_path, filedata ):
 	output['updaters'].append( filedata )
 
 
-def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=None, source_prefix=None ):
+def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=None, source_prefix=None, target_prefix=None ):
 	print( 'Traversing: %s' % source )
 	
 	for root, dirs, files in os.walk( source ):
@@ -122,6 +130,8 @@ def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=No
 						arch_bit = get_arch_id( 'x86' )
 					elif 'x64' in fullpath:
 						arch_bit = get_arch_id( 'x64' )
+					else:
+						arch_bit = 0
 						
 				platform_id = 0
 				if current_platform != None:
@@ -131,35 +141,62 @@ def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=No
 				if flags > 0:
 					filedata['flags'] = flags
 				
-				relative_path = make_relative_to( fullpath, source)
+				relative_path = make_relative_to( fullpath, source )
 				relative_path = relative_path.replace("\\", "/")
-				
-				if source_prefix != None:
-					filedata['target'] = relative_path
-					relative_path = '/' + source_prefix + relative_path
 
+				if source_prefix != None:									
+					relative_path = '/' + source_prefix + relative_path
+					relative_path = relative_path.replace( '//', '/' )
+					#print( 'relative_path=%s' % relative_path )
+
+					
+				if target_prefix != None:
+					filedata['target'] = target_prefix + relative_path
+				else:
+					filedata['target'] = relative_path
+
+				if filedata['target'] == relative_path:
+					del filedata['target']
+
+						
 				add_file( fullpath, relative_path, filedata )
 
 
-def traverse_binaries( source, binary_path, platforms, ignore_list=[] ):
-	abs_bin_path = os.path.normpath( source + '/' + binary_path )
+def traverse_binaries( source, binary_source, platforms, ignore_list=[] ):
+	abs_bin_path = os.path.normpath( source + '/' + binary_source )
+	
+	target_prefix = cfg['binary_target']
+	
 	for platform in platforms:
+				
+		'''
+		vars['PLATFORM'] = platform
+				
 		# the source folder to start from
-		binary_source = os.path.normpath( abs_bin_path + '/' + platform )
+		abs_binary_source = os.path.normpath( var_replace(abs_bin_path, vars) + '/' )
+		'''		
+				
+		# the source folder to start from
+		abs_binary_source = os.path.normpath( abs_bin_path )
 		
 		# prefix to relative file path
-		source_prefix = binary_path + '/' + platform
-		traverse_files( binary_source, ignore_list, arch_agnostic=False, current_platform=platform, source_prefix=source_prefix )
+		source_prefix = binary_source + '/'
+		
+		#print( 'source_prefix=%s' % source_prefix )
+		print( 'abs_binary_source=%s' % abs_binary_source )
+		traverse_files( abs_binary_source, ignore_list, arch_agnostic=False, current_platform=platform )
 
 			
 # content from main deploy path
 content_ignore_list = ignore_list[:]
-binary_path_match = '*/%s/*' % cfg['binary_path']
+binary_path_match = '*/%s/*' % cfg['binary_source']
 content_ignore_list.extend( ignores_to_regex( [ binary_path_match ] ) )
+print( 'abs_content_path=%s' % cfg['abs_content_path'] )
 traverse_files( cfg['abs_content_path'], content_ignore_list )
 
+print( 'abs_deploy_base=%s' % cfg['abs_deploy_base'] )
 # binaries for each platform
-traverse_binaries( cfg['abs_deploy_base'], cfg['binary_path'], cfg['platforms'], ignore_list )
+traverse_binaries( cfg['abs_deploy_base'], cfg['binary_source'], cfg['platforms'], ignore_list )
 
 			
 '''
