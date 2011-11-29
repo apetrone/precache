@@ -231,3 +231,5 @@ int precache_should_update_self( precache_state_t * precache );
 // convert a string of characters (chmod) to integer flags
 int precache_mode_string_to_integer( const char * mode );
 #endif
+
+void float_color_to_char( float * colors, unsigned char * out );

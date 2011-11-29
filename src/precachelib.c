@@ -464,3 +464,18 @@ int precache_mode_string_to_integer( const char * mode )
 	return value;
 } // precache_mode_string_to_integer
 #endif
+
+
+void float_color_to_char( float * colors, unsigned char * out )
+{
+	if ( !out || !colors )
+	{
+		log_msg( "* invalid pointer to float_color_to_char!\n" );
+		return;
+	}
+
+	out[0] = (unsigned char)(colors[0] * 255.0);
+	out[1] = (unsigned char)(colors[1] * 255.0);
+	out[2] = (unsigned char)(colors[2] * 255.0);
+	out[3] = (unsigned char)(colors[3] * 255.0);
+} // float color to char

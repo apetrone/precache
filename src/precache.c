@@ -62,6 +62,10 @@ typedef struct
 	char msg2[ 256 ];
 	unsigned char msg_color[4];
 	int textpos[ 4 ];
+
+	unsigned char button_color[4];
+	unsigned char button_hover_color[4];
+	unsigned char button_text_color[4];
 } application_state_t;
 application_state_t state;
 
@@ -571,9 +575,12 @@ void process_downloads()
 
 void tick()
 {
+	float backgroundColor[4] = PRECACHE_WINDOW_BACKGROUND_COLOR;
+
     xwl_pollevent( &state.event );
 
-	glClearColor(0.25, 0.25, 0.25, 1.0);
+	
+	glClearColor( backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] );
 	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	glViewport( 0, 0, state.width, state.height );
 
@@ -591,15 +598,15 @@ void tick()
 
 	if ( mouse_inside_button( &state.closeButton ) )
 	{
-		state.closeButton.color[0] = 0;
-		state.closeButton.color[1] = 192;
-		state.closeButton.color[2] = 192;
+		state.closeButton.color[0] = state.button_color[0];
+		state.closeButton.color[1] = state.button_color[1];
+		state.closeButton.color[2] = state.button_color[2];
 	}
 	else
 	{
-		state.closeButton.color[0] = 0;
-		state.closeButton.color[1] = 128;
-		state.closeButton.color[2] = 128;
+		state.closeButton.color[0] = state.button_hover_color[0];
+		state.closeButton.color[1] = state.button_hover_color[1];
+		state.closeButton.color[2] = state.button_hover_color[2];
 	}
 
 
@@ -620,7 +627,7 @@ void tick()
 	}
 
 	// render button text
-	font_draw( &state.font, 388, 114, "Close", 255, 255, 255, 255 );
+	font_draw( &state.font, 388, 114, "Close", state.button_text_color[0], state.button_text_color[1], state.button_text_color[2], state.button_text_color[3] );
 
     // do a swap of buffers
 	xwl_finish();
@@ -646,6 +653,9 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	precache_file_t * file;
 	char log_path[ MAX_PATH_SIZE ];
 
+	float button_color[4] = PRECACHE_BUTTON_COLOR;
+	float button_hover_color[4] = PRECACHE_BUTTON_HOVER_COLOR;
+	float button_text_color[4] = PRECACHE_BUTTON_TEXT_COLOR;
 #if !PRECACHE_TEST
 	char temp_path[ MAX_PATH_SIZE ];
 #else
@@ -664,9 +674,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	state.closeButton.height = 25;
 	state.closeButton.x = 365;
 	state.closeButton.y = 95;
-	state.closeButton.color[0] = 0;
-	state.closeButton.color[1] = 128;
-	state.closeButton.color[2] = 128;
+
 
 	// setup progress bar
 	state.bar.event = 0;
@@ -683,6 +691,11 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	state.textpos[1] = 25;
 	state.textpos[2] = 30;
 	state.textpos[3] = 45;
+
+	// convert colors
+	float_color_to_char( button_color, state.button_color );
+	float_color_to_char( button_hover_color, state.button_hover_color );
+	float_color_to_char( button_text_color, state.button_text_color );
 
 	state.progressBarWidth = 400;
 	state.downloadPercent = 0;
