@@ -9,7 +9,8 @@ import stat
 # NOTE: These values MUST match the same values in the precachelib.h
 PRECACHE_FILE_ARCH_BIT = 0
 PRECACHE_FILE_PLATFORM_BIT = 4
-PRECACHE_FILE_DEFAULT_MODE = '666'
+PRECACHE_FILE_EXECUTE_BIT = 8
+PRECACHE_FILE_DEFAULT_MODE = '755'
 
 # -----------------------------------------------------------------------------
 # Utils
@@ -124,9 +125,9 @@ def get_arch_id( arch ):
 
 
 
-def create_flags( arch_id, os_id ):
+def create_flags( arch_id, os_id, execute_bit ):
 	""" condense these ids into a single value """
-	return (int(arch_id) << PRECACHE_FILE_ARCH_BIT | int(os_id) << PRECACHE_FILE_PLATFORM_BIT)	
+	return (int(arch_id) << PRECACHE_FILE_ARCH_BIT | int(os_id) << PRECACHE_FILE_PLATFORM_BIT | int(execute_bit) << PRECACHE_FILE_EXECUTE_BIT)	
 
 
 def make_relative_to( inpath, relpath ):
@@ -140,6 +141,7 @@ def make_relative_to( inpath, relpath ):
 def default_file_mode():
 	return PRECACHE_FILE_DEFAULT_MODE
 	
+# return a tuple of owner, group, other flags
 def get_mode_for_file( fullpath ):
 	mode = os.stat( fullpath ).st_mode
 	owner = 0
@@ -165,6 +167,6 @@ def get_mode_for_file( fullpath ):
 		other |= 2
 	if mode & stat.S_IXOTH:
 		other |= 1	
+
+	return (owner, group, other)
 	
-	chmod = ('%s%s%s' % (owner, group, other))
-	return chmod

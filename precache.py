@@ -38,7 +38,7 @@ if file_exists( config_path ):
 	cfg = load_config( config_path )
 
 	cfg['abs_target_path'] = os.path.normpath( os.path.abspath( os.path.dirname( cmdline.config_file ) ) )
-	print( 'Absolute target path: %s' % cfg['abs_target_path'] )	
+	#print( 'Absolute target path: %s' % cfg['abs_target_path'] )	
 	
 	# convert excludes
 	ignore_list = ignores_to_regex( cfg['excludes'] )
@@ -70,7 +70,7 @@ if file_exists( config_path ):
 	cfg['abs_deploy_base'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['local_project_path']))
 	cfg['abs_content_path'] = os.path.normpath( cfg['abs_deploy_base'] + '/' + cfg['content_path'] )
 
-	print( 'Absolute deploy path: %s' % cfg['abs_deploy_base'] )
+	#print( 'Absolute deploy path: %s' % cfg['abs_deploy_base'] )
 	
 else:
 	print( 'Configuration %s not found' % config_path )
@@ -94,29 +94,32 @@ def add_updater( fullpath, relative_path, filedata ):
 
 
 def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=None, source_prefix=None, target_prefix=None ):
-	print( 'Traversing: %s' % source )
+	#print( 'Traversing: %s' % source )
 	
 	for root, dirs, files in os.walk( source ):
 		for f in files:
 			path_ignored = False
 			fullpath = root + os.path.sep + f
 			
-			print( 'fullpath=%s' % fullpath )
+			#print( 'fullpath=%s' % fullpath )
 			for i in ignore_list:
 				if i.match( fullpath ):
-					print( 'Ignoring path %s -> %s' % (fullpath, i) )
+					#print( 'Ignoring path %s -> %s' % (fullpath, i) )
 					path_ignored=True
 					break
 			
 			if not path_ignored:
 				filedata = {}
-				chmod = get_mode_for_file( fullpath )
-				#print( fullpath )
-				#print( 'Permissions %s' % (chmod) )
+				
+				# determine file mode permissions
+				owner,group,other = get_mode_for_file( fullpath )
+				chmod = ('%s%s%s' % (owner, group, other))
 				if chmod != default_file_mode():
 					filedata['mode'] = chmod
 					
-				
+				execute_bit = 0
+				if (owner & 1) > 0 or (group & 1) > 0:
+					execute_bit = 1
 					
 				arch_bit = 0
 				if not arch_agnostic:
@@ -126,25 +129,21 @@ def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=No
 						arch_bit = get_arch_id( 'x64' )
 					else:
 						arch_bit = 0
-						
+				
 				platform_id = 0
 				if current_platform != None:
 					platform_id = get_platform_id( current_platform )
 				
-				flags = create_flags( arch_bit, platform_id )
+				flags = create_flags( arch_bit, platform_id, execute_bit )
 				if flags > 0:
-					#print( 'arch_bit=%s, platform_id=%s' % (arch_bit, platform_id) )
 					filedata['flags'] = flags
 				
 				relative_path = make_relative_to( fullpath, source )
 				relative_path = relative_path.replace("\\", "/")
 
-				print( 'relative_path is %s' % relative_path )
 				if source_prefix != None:
 					relative_path = '/' + source_prefix + relative_path
 					relative_path = relative_path.replace( '//', '/' )
-					print( 'relative_path=%s' % relative_path )
-
 					
 				if target_prefix != None:
 					filedata['target'] = target_prefix + relative_path
@@ -154,137 +153,36 @@ def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=No
 				if filedata['target'] == relative_path:
 					del filedata['target']
 
-						
 				add_file( fullpath, relative_path, filedata )
 
-
-def traverse_binaries( source, binary_source, platforms, ignore_list=[] ):
-	abs_bin_path = os.path.normpath( source + '/' + binary_source )
-	
-	target_prefix = cfg['binary_target']
-	
-	for platform in platforms:
-				
-		'''
-		vars['PLATFORM'] = platform
-				
-		# the source folder to start from
-		abs_binary_source = os.path.normpath( var_replace(abs_bin_path, vars) + '/' )
-		'''		
-				
-		# the source folder to start from
-		abs_binary_source = os.path.normpath( abs_bin_path )
 		
-		# prefix to relative file path
-		source_prefix = binary_source + '/'
-		
-		#print( 'source_prefix=%s' % source_prefix )
-		print( 'abs_binary_source=%s' % abs_binary_source )
-		traverse_files( abs_binary_source, ignore_list, arch_agnostic=False, current_platform=platform )
-
-		
-		
-def traverse_binaries2( source, binaries, ignore_list=[] ):
-	#abs_bin_path = os.path.normpath( source + '/' + binary_source )
-	print( 'traverse_binaries2' )
-	
+def traverse_binaries( source, binaries, ignore_list=[] ):	
 	for platform in binaries.keys():
 
 		# the source folder to start from
 		abs_binary_source = os.path.normpath( source + '/' + binaries[ platform ] )
 		
 		# prefix to relative file path
-		#source_prefix = binaries[ platform ] + '/'
 		source_prefix = cfg['binary_path']
 		
-		print( 'abs_binary_source=%s' % abs_binary_source )
-		print( 'source_prefix=%s' % source_prefix )
-		
 		traverse_files( abs_binary_source, ignore_list, arch_agnostic=False, current_platform=platform, source_prefix=source_prefix )
-
-		
-		
-		
 		
 # content from main deploy path
 content_ignore_list = ignore_list[:]
 
 # ignore any folder specified in the binaries folder, we traverse these separately
 if 'binaries' in cfg:
-	print( 'ignoring, test' )
 	for entry in cfg['binaries'].keys():
 		binary_path_match = '*/%s/*' % cfg['binaries'][ entry ]
 		content_ignore_list.extend( ignores_to_regex( [ binary_path_match ] ) )
-	
-print( 'abs_content_path=%s' % cfg['abs_content_path'] )
+
+# traverse main content files		
 traverse_files( cfg['abs_content_path'], content_ignore_list )
 
-print( 'abs_deploy_base=%s' % cfg['abs_deploy_base'] )
-# binaries for each platform
-#traverse_binaries( cfg['abs_deploy_base'], cfg['binary_source'], cfg['platforms'], ignore_list )
-
+# traverse binaries for each platform; if specified in the config
 if 'binaries' in cfg:
-	traverse_binaries2( cfg['abs_deploy_base'], cfg['binaries'], ignore_list )
-
-			
-'''
-
-			
-if updaters != None and 'updater_path' in cfg:
-	output['updaters'] = []
-	print( 'Process updaters...' )
-	print( cfg['updater_path'] )
-	for platform_string in updaters:
-		update_entry = updaters[ platform_string ]
-		ignore_list = []
-		run_list = []
-		
-		if 'ignores' in update_entry:
-			ignore_list = ignores_to_regex( update_entry['ignores'] )
-			
-		if 'runlist' in update_entry:
-			run_list = ignores_to_regex( update_entry['runlist'] )
+	traverse_binaries( cfg['abs_deploy_base'], cfg['binaries'], ignore_list )
 	
-		entry_path = update_entry[ 'src' ]
-		elpath = os.path.normpath( cfg['abs_updater_path'] + entry_path )
-		print( elpath )
-
-		for root, dirs, files in os.walk( elpath ):
-			for file in files:
-				path_ignored = False
-				in_runlist = False
-				fullpath = root + os.path.sep + file
-				
-				# check to see if we should ignore this
-				for i in ignore_list:
-					if i.match( fullpath ):
-						path_ignored = True
-						break
-						
-				for i in run_list:
-					if i.match( fullpath ):
-						in_runlist = True
-						break			
-						
-				if not path_ignored:
-					print( fullpath )
-					relative_path = make_relative_to( fullpath, os.path.normpath(cfg['abs_updater_path'] + entry_path) )
-					relative_path = relative_path.replace( "\\", "/" )
-					print( relative_path )
-					
-
-					filedata = {}
-					arch_bit = 0
-					
-					chmod = get_mode_for_file( fullpath )
-					print( 'Permissions %s' % (chmod) )
-					if chmod != default_file_mode():
-						filedata['mode'] = chmod
-					filedata['target'] = relative_path
-					filedata['flags'] = create_flags( arch_bit, get_platform_id(platform_string) )
-					
-					add_updater( fullpath, relative_path, filedata )
-'''
 jsondata = json.dumps(output, indent=4, sort_keys=True)
 
 print( 'Writing precache file: %s' % cfg['output_file'] )

@@ -7,7 +7,7 @@
 
 #define PRECACHE_USER_AGENT "precache-downloader"
 #define PRECACHE_TIMEOUT_MS 3000
-#define PRECACHE_DEFAULT_FILE_PERMISSIONS "666"
+#define PRECACHE_DEFAULT_FILE_PERMISSIONS "755"
 #define PRECACHE_TEMP_BUFFER_SIZE 512
 #define PRECACHE_STATE_DOWNLOAD_REQUEST 1 // request to download a file
 #define PRECACHE_STATE_DOWNLOAD 2 // downloading a file
