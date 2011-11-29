@@ -28,6 +28,10 @@ KNOWN ISSUES
 XWLE_TEXT events on Linux only generate ASCII equivalent Unicode values.
 Lighttpd (1.4.10) on Windows sometimes sends the wrong-content length.
 
+Tested with Apache 2.2.9, nginx 1.1.8
+
+NOTE: It is very important precache.py is executed on a unix-based platform when generating precache.list for unix platforms to maintain file permissions
+
 BUILDING
 
 The code should successfully build under Linux, Windows, and Mac OSX 10.6.x+
@@ -63,48 +67,56 @@ Application icon: edit the file pertaining to the associated platform.
 		resources/precache.icns
 		
 
-Sample configuration file:
-{	
-	"target_path" : "./build",
-	"basename" : "project_name",
+Configuration file example:
+
+This is a simple config used to specify variables to precache. This assumes an application is for a single platform.
+install_path: The folder to place downloaded content (on a user's machine)
+remote_project_path: The path on the remote server where the content will be hosted (relative to the root of the server).
+	In this example, if precache pointed to "http://localhost", then files should be located in "http://localhost/build1234/"
+local_project_path: Used for generating precache.list; the folder, on your deployment machine which runs precache.py, where the application content root is.
+	In this example: "project" is a folder which contains "precache.conf", and a folder: "deploy". Deploy is used as a root for content.
+excludes: A list of ignores that are applied when walking the local_project_path
+
+----------------
+{
+	"install_path" : "appname",
+	"remote_project_path" : "build1234",
+	"local_project_path" : "deploy",
 	
 	"excludes" : 
 	[
-		"*bin/*",
-		"*obj/*",
-		"*logs/*",
-		"*.pch",
-		"*.ipch",
-		"*.conf",
-		"*.pdb",
-		"*.ilk",
-		"*.sdf",
-		"*.sln",
-		"*.suo",
-		"*.vcproj",
-		"*.vcxproj"
+		"*.dSYM/*",
+		"*.DS_Store"
+	]
+}
+----------------
+
+
+Here is another configuration file which is platform aware - meaning it only syncs the binaries for that platform.
+
+deploy contains a folder "bin", which contains three folders, one for each platform "windows", "linux", "macosx".
+
+binary_path: Used in this example to specify a binary root path which all binaries are synced to on the local machine. 
+	It is needed because relative paths are resolved and would ordinarily be placed in the paths listed in "binaries". 
+	Instead, we want them to appear in a more generic "bin" folder inside our project folder.
+----------------	
+{
+	"install_path" : "appname",
+	"remote_project_path" : "build1234",
+	"local_project_path" : "deploy",
+	"binary_path" : "bin",
+	
+	"excludes" : 
+	[
+		"*.dSYM/*",
+		"*.DS_Store"
 	],
 	
-	"map" :
+	"binaries" :
 	{
-		"windows" :
-		{
-			"bin/x64/windows/file.exe" : "bin/x64/file.exe",
-			"bin/x86/windows/file.exe" : "bin/x86/file.exe"
-		},
-		
-		"linux" : 
-		{
-			"bin/x64/linux/file" : "bin/x64/file",
-			"bin/x86/linux/file" : "bin/x86/file"
-		},
-		
-		"macosx" :
-		{
-			"bin/x64/macosx/file.app" : "bin/x64/file.app",
-			"bin/x86/macosx/file.app" : "bin/x86/file.app"
-		}
+		"windows" : "bin/windows"
+		"linux" : "bin/linux",
+		"macosx" : "bin/macosx"
 	}
 }
-
-
+----------------

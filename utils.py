@@ -93,6 +93,7 @@ def ignores_to_regex( excludes ):
 		e = e.replace('.', '\\.')
 		e = e.replace('*', '.*')
 		pat = re.compile( e )
+		#print( 'e: %s -> %s' % (e, pat) )
 		ignore_list.append( pat )
 	return ignore_list
 
