@@ -140,18 +140,25 @@ def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=No
 				
 				relative_path = make_relative_to( fullpath, source )
 				relative_path = relative_path.replace("\\", "/")
-
-				if source_prefix != None:
-					relative_path = '/' + source_prefix + relative_path
-					relative_path = relative_path.replace( '//', '/' )
+				
 					
 				if target_prefix != None:
 					filedata['target'] = target_prefix + relative_path
 				else:
 					filedata['target'] = relative_path
+					
+				
+					
+				if source_prefix != None:
+					relative_path = '/' + source_prefix + relative_path
+					relative_path = relative_path.replace( '//', '/' )
+
 
 				if filedata['target'] == relative_path:
 					del filedata['target']
+				else:
+					if filedata['target'][0] != '/':
+						filedata['target'] = '/' + filedata['target']
 
 				add_file( fullpath, relative_path, filedata )
 
@@ -163,9 +170,9 @@ def traverse_binaries( source, binaries, ignore_list=[] ):
 		abs_binary_source = os.path.normpath( source + '/' + binaries[ platform ] )
 		
 		# prefix to relative file path
-		source_prefix = cfg['binary_path']
-		
-		traverse_files( abs_binary_source, ignore_list, arch_agnostic=False, current_platform=platform, source_prefix=source_prefix )
+		source_prefix = cfg['binary_path'] + '/' + platform
+		target_prefix = cfg['binary_path']
+		traverse_files( abs_binary_source, ignore_list, arch_agnostic=False, current_platform=platform, source_prefix=source_prefix, target_prefix=target_prefix )
 		
 # content from main deploy path
 content_ignore_list = ignore_list[:]
