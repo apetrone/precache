@@ -42,9 +42,6 @@ if file_exists( config_path ):
 	
 	# convert excludes
 	ignore_list = ignores_to_regex( cfg['excludes'] )
-
-	if 'content_path' not in cfg:
-		cfg['content_path'] = ""
 				
 	if 'updater_path' in cfg:
 		cfg['abs_updater_path'] = os.path.normpath( cfg['abs_target_path'] + '/' + cfg['updater_path'] )
@@ -60,15 +57,12 @@ if file_exists( config_path ):
 	if output['remote_project_path'][0] is not '/':
 		output['remote_project_path'] = '/' + output['remote_project_path']
 		
-		
+
 	if 'platforms' not in cfg:
 		cfg['platforms'] = [ get_platform() ]
-		
-		
-
 	
 	cfg['abs_deploy_base'] = os.path.normpath(os.path.abspath(cfg['abs_target_path'] + '/' + cfg['local_project_path']))
-	cfg['abs_content_path'] = os.path.normpath( cfg['abs_deploy_base'] + '/' + cfg['content_path'] )
+	cfg['abs_content_path'] = os.path.normpath( cfg['abs_deploy_base'] + '/' )
 
 	#print( 'Absolute deploy path: %s' % cfg['abs_deploy_base'] )
 	
@@ -147,6 +141,8 @@ def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=No
 				else:
 					filedata['target'] = relative_path
 					
+				if filedata['target'][0] != '/':
+					filedata['target'] = '/' + filedata['target']
 				
 					
 				if source_prefix != None:
@@ -156,9 +152,7 @@ def traverse_files( source, ignore_list, arch_agnostic=True, current_platform=No
 
 				if filedata['target'] == relative_path:
 					del filedata['target']
-				else:
-					if filedata['target'][0] != '/':
-						filedata['target'] = '/' + filedata['target']
+
 
 				add_file( fullpath, relative_path, filedata )
 
@@ -170,8 +164,9 @@ def traverse_binaries( source, binaries, ignore_list=[] ):
 		abs_binary_source = os.path.normpath( source + '/' + binaries[ platform ] )
 		
 		# prefix to relative file path
-		source_prefix = cfg['binary_path'] + '/' + platform
+		source_prefix = binaries[ platform ]
 		target_prefix = cfg['binary_path']
+
 		traverse_files( abs_binary_source, ignore_list, arch_agnostic=False, current_platform=platform, source_prefix=source_prefix, target_prefix=target_prefix )
 		
 # content from main deploy path
