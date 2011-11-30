@@ -942,8 +942,10 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
 	thread_stop( &state.t0 );
 
+#if PRECACHE_CLEANUP_LIST
 	// cleanup the precache list from the filesystem...
-	//unlink( state.ps.precache_file );
+	unlink( state.ps.precache_file );
+#endif
 
 	log_msg( "* Shutting down gracefully.\n" );
 
@@ -954,5 +956,12 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	xwl_shutdown();
 	net_shutdown();
 	log_shutdown();
+
+
+#if PRECACHE_CLEANUP_LOG
+	// cleanup the log from the filesystem...
+	unlink( log_path );
+#endif
+
 	return 0;
 }

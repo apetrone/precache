@@ -16,6 +16,12 @@
 #define KB_DIV 1024
 #define MB_DIV 1048576
 
+// if > 0, will attempt to remove the precache.list on exit
+#define PRECACHE_CLEANUP_LIST 1
+
+// if > 0, will attempt to remove the precache.log on exit
+#define PRECACHE_CLEANUP_LOG 0
+
 // define as > 0 to testing
 // define as 0 for normal operations
 #define PRECACHE_TEST 0

@@ -11,8 +11,8 @@
 extern "C" {
 #endif
 
-//#define dprintf //
-#define dprintf log_msg
+#define dprintf //
+//#define dprintf log_msg
 
 void http_download_write( http_download_state_t * state, const char * data, int dataSize )
 {
