@@ -23,14 +23,14 @@ freely, subject to the following restrictions:
 
 Portions of SFML were used for the window code.
 
+
+Tested with Apache 2.2.16 (linux), nginx 1.1.8 (windows), Lighttpd 1.4.10 (windows)
+
 KNOWN ISSUES
 
-XWLE_TEXT events on Linux only generate ASCII equivalent Unicode values.
-Lighttpd (1.4.10) on Windows sometimes sends the wrong-content length.
-
-Tested with Apache 2.2.9, nginx 1.1.8
-
 NOTE: It is very important precache.py is executed on a unix-based platform when generating precache.list for unix platforms to maintain file permissions
+XWLE_TEXT events on Linux only generate ASCII equivalent Unicode values.
+
 
 BUILDING
 

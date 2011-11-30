@@ -6,7 +6,7 @@
 #include "vars.h"
 
 #define PRECACHE_USER_AGENT "precache-downloader"
-#define PRECACHE_TIMEOUT_MS 3000
+#define PRECACHE_TIMEOUT_MS 20000
 #define PRECACHE_DEFAULT_FILE_PERMISSIONS "755"
 #define PRECACHE_TEMP_BUFFER_SIZE 512
 #define PRECACHE_STATE_DOWNLOAD_REQUEST 1 // request to download a file

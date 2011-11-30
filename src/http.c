@@ -11,8 +11,8 @@
 extern "C" {
 #endif
 
-#define dprintf //
-//#define dprintf log_msg
+//#define dprintf //
+#define dprintf log_msg
 
 void http_download_write( http_download_state_t * state, const char * data, int dataSize )
 {
@@ -260,12 +260,16 @@ void http_download_tick( http_download_state_t * state, int timeout_seconds )
                                 state->error = 1;
                                 if ( status == 404 )
                                 {
-                                    printf( "File not Found!\n" );
+                                    dprintf( "File not Found!\n" );
                                 }
                                 else if ( status == 500 )
                                 {
-                                    printf( "Internal Server Error!\n" );
+                                    dprintf( "Internal Server Error!\n" );
                                 }
+								else
+								{
+									dprintf( "* Unknown status: %i\n", status );
+								}
                             }
                         }
 

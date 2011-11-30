@@ -21,7 +21,6 @@
 	#include <GL/glx.h>
 #endif
 
-
 #include <xwl/xwl.h>
 #include <thread.h>
 #include "font.h"
@@ -66,6 +65,9 @@ typedef struct
 	unsigned char button_color[4];
 	unsigned char button_hover_color[4];
 	unsigned char button_text_color[4];
+	unsigned char bar_outline_color[4];
+	unsigned char bar_empty_color[4];
+	unsigned char bar_complete_color[4];
 } application_state_t;
 application_state_t state;
 
@@ -97,7 +99,6 @@ i32 mouse_inside_button( button * b )
 		return 0;
 	return 1;
 }
-
 
 void callback( xwl_event_t * e )
 {
@@ -174,9 +175,9 @@ void render_button( button * b )
 	glEnd();
 }
 
-void render_button_frame( button * b, int width, int height )
+void render_button_frame( button * b, int width, int height, unsigned char * color )
 {
-	glColor3ub( 0, 0, 0 );
+	glColor3ub( color[0], color[1], color[2] );
 	glBegin( GL_LINES );
 
 		glVertex2i( b->x, b->y );
@@ -194,6 +195,28 @@ void render_button_frame( button * b, int width, int height )
 	glEnd();
 }
 
+void render_progress_bar( button * bar, int progressBarWidth, unsigned char * bgcolor, unsigned char * outline_color )
+{
+	unsigned char prev_color[4];
+	int prev_width;
+
+	// store old color and width
+	memcpy( prev_color, bar->color, sizeof(unsigned char) * 4 );
+	prev_width = bar->width;
+
+	// set background color and render bar
+	memcpy( bar->color, bgcolor, sizeof(unsigned char) * 4 );
+	bar->width = progressBarWidth;
+	render_button( bar );
+
+	// restore old color and render bar
+	memcpy( bar->color, prev_color, sizeof(unsigned char) * 4 );
+	bar->width = prev_width;
+	render_button( bar );
+
+	// render outline
+	render_button_frame( bar, progressBarWidth, bar->height, outline_color );
+}
 
 static g_thread_id = 0;
 
@@ -243,6 +266,7 @@ THREAD_ENTRY precache_download_thread( void * data )
 			{
 				// if we haven't read any more bytes, see how long it's been since we last read bytes
 				dt = (timer_ms(&state.ts) - last_read);
+
 				if ( dt > PRECACHE_TIMEOUT_MS )
 				{
 					THREAD_MSG( "-> T: %i - Download of file \"%s\" timed out (%g)!\n", thread_id, remotepath, timer_ms(&state.ts) );
@@ -287,8 +311,6 @@ THREAD_ENTRY precache_download_thread( void * data )
 					THREAD_MSG( "-> T: %i - download complete!\n", thread_id );
 
 					// set permissions on this file
-					log_msg( "XYZ -> %s\n", precache->curfile->path );
-
 #if LINUX || __APPLE__
 					log_msg( "* Set permissions on file... (%i)\n", precache->curfile->mode );
 					result = chmod( localpath, precache->curfile->mode );
@@ -383,9 +405,9 @@ void process_downloads()
 	{
 		if ( state.downloadState.completed )
 		{
-			state.bar.color[0] = 16;
-			state.bar.color[1] = 128;
-			state.bar.color[2] = 16;
+			state.bar.color[0] = state.bar_complete_color[0];
+			state.bar.color[1] = state.bar_complete_color[1];
+			state.bar.color[2] = state.bar_complete_color[2];
 
 			state.downloadState.completed = 0;
 			state.downloadPercent = 1;
@@ -520,10 +542,7 @@ void process_downloads()
 
 		if ( state.downloadState.completed )
 		{
-			state.bar.color[0] = 16;
-			state.bar.color[1] = 128;
-			state.bar.color[2] = 16;
-
+			// switching states; reset colors, completed, etc.
 			state.downloadState.completed = 0;
 			log_msg( "\tDownloading \"%s\" -> success! (%i/%i)\n", state.ps.curfile->path, state.downloadState.bytes_read, state.downloadState.content_length );
 			state.ps.curfile->flags = PF_DOWNLOADED;
@@ -531,9 +550,10 @@ void process_downloads()
 		}
 		else
 		{
-			state.bar.color[0] = 0;
-			state.bar.color[1] = 255;
-			state.bar.color[2] = 0;
+
+			state.bar.color[0] = state.bar_complete_color[0];
+			state.bar.color[1] = state.bar_complete_color[1];
+			state.bar.color[2] = state.bar_complete_color[2];
 		}
 	}
 
@@ -592,9 +612,13 @@ void tick()
 	glMatrixMode( GL_MODELVIEW );
 	glLoadIdentity();
 
+	state.bar.width = (i16)(state.downloadPercent * state.progressBarWidth);
+
+	// render close button
 	render_button( &state.closeButton );
-	render_button( &state.bar );
-	render_button_frame( &state.bar, state.progressBarWidth, state.bar.height );
+
+	// render progress bar
+	render_progress_bar( &state.bar, state.progressBarWidth, state.bar_empty_color, state.bar_outline_color );
 
 	if ( mouse_inside_button( &state.closeButton ) )
 	{
@@ -610,7 +634,7 @@ void tick()
 	}
 
 
-	state.bar.width = (i16)(state.downloadPercent * state.progressBarWidth);
+	
 
 	// draw black text to act as a drop-shadow
 	font_draw( &state.font, state.textpos[0]+2, state.textpos[1]+2, state.msg, 0, 0, 0, 255 );
@@ -656,6 +680,10 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	float button_color[4] = PRECACHE_BUTTON_COLOR;
 	float button_hover_color[4] = PRECACHE_BUTTON_HOVER_COLOR;
 	float button_text_color[4] = PRECACHE_BUTTON_TEXT_COLOR;
+
+	float bar_outline_color[4] = PRECACHE_PROGRESSBAR_OUTLINE_COLOR;
+	float bar_empty_color[4] = PRECACHE_PROGRESSBAR_EMPTY_COLOR;
+	float bar_complete_color[4] = PRECACHE_PROGRESSBAR_COMPLETE_COLOR;
 #if !PRECACHE_TEST
 	char temp_path[ MAX_PATH_SIZE ];
 #else
@@ -682,9 +710,7 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	state.bar.y = 60;
 	state.bar.height = 15;
 	state.bar.width = 1;
-	state.bar.color[0] = 255;
-	state.bar.color[1] = 0;
-	state.bar.color[2] = 255;
+
 
 	// setup text position
 	state.textpos[0] = 30;
@@ -697,8 +723,21 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	float_color_to_char( button_hover_color, state.button_hover_color );
 	float_color_to_char( button_text_color, state.button_text_color );
 
+	float_color_to_char( bar_outline_color, state.bar_outline_color );
+	float_color_to_char( bar_empty_color, state.bar_empty_color );
+	float_color_to_char( bar_complete_color, state.bar_complete_color );
+
 	state.progressBarWidth = 400;
 	state.downloadPercent = 0;
+
+#if PRECACHE_TEST
+	state.downloadPercent = 0.5;
+
+	state.bar.color[0] = state.bar_complete_color[0];
+	state.bar.color[1] = state.bar_complete_color[1];
+	state.bar.color[2] = state.bar_complete_color[2];
+	state.bar.color[3] = state.bar_complete_color[3];
+#endif
 
 	memset(&state.downloadState, 0, sizeof(http_download_state_t));
     state.tdata.download = &state.downloadState;
