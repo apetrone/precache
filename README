@@ -1,3 +1,5 @@
+precache
+
 Copyright (c) <2011> <Adam Petrone>
 
 This software is provided 'as-is', without any express or implied
@@ -19,18 +21,78 @@ freely, subject to the following restrictions:
    3. This notice may not be removed or altered from any source
    distribution.
 
+--------------------------------------------------------------------------------------
+JSON_parser - Jean Gressmann
+
+Copyright (c) 2005 JSON.org
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+The Software shall be used for Good, not Evil.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------------------
+xwl
+
+Copyright (c) <2011> <Adam Petrone>
+
+This software is provided 'as-is', without any express or implied
+warranty. In no event will the authors be held liable for any damages
+arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+
+   1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required.
+
+   2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+
+   3. This notice may not be removed or altered from any source
+   distribution.
+
+Portions of SFML (Laurent Gomila's project) were used for the windowing code.
+--------------------------------------------------------------------------------------
 
 
-Portions of SFML were used for the window code.
+
+PRECACHE
+
+Precache is a cross-platform program for application distribution over HTTP. It is inspired by Mojang's Minecraft and other similar systems.
+The design goals are:
+- cross-platform among Linux, Windows, and MacOSX.
+- Ease of use. Config files are written in JSON.
+- little or no external dependencies (xwl has a very small footprint)
+- favor the smallest binary possible. Fonts are embedded and a simple font renderer is included.
 
 
-Tested with Apache 2.2.16 (linux), nginx 1.1.8 (windows), Lighttpd 1.4.10 (windows)
 
-KNOWN ISSUES
+KNOWN ISSUES / LIMITATIONS
 
 NOTE: It is very important precache.py is executed on a unix-based platform when generating precache.list for unix platforms to maintain file permissions
 XWLE_TEXT events on Linux only generate ASCII equivalent Unicode values.
-
+The project has a built-in font renderer to reduce external dependencies. At the moment, this requires fonts are exported in a custom format. The plan is to have a better system in its place eventually.
+The User Interface is very simplistic - again to reduce external dependencies. The source is available, so a developer could always hook up their own GUI in place of the minimalistic one.
+Currently, only connections through HTTP are supported. I have tested with the following servers: Apache 2.2.16 (linux), nginx 1.1.8 (windows), Lighttpd 1.4.10 (windows)
 
 BUILDING
 
@@ -51,7 +113,26 @@ I have tested the following project files under the respective OS.
 	* You may need to clear the entry point from the visual studio project properties so it does not look for "mainCRTStartup".
 	This appears to be a bug in the current version of Premake4.
 
+	Project dependency on xwl:
+	This is included in the precache source, but may one day be removed as it has its own github project: http://github.com/apetrone/xwl/
+	Be aware that it is a dependency for window code.
 
+
+USAGE
+
+The basic usage is this:
+
+You have a deployment folder that you want to distribute to users, players, testers, etc.
+
+1) Create a configuration file (see examples below) for your project. I'll refer to this as "project.conf", but you could name it anything.
+2) Run the precache.py script and specify the configuration file you just created.
+	NOTE: If you're supporting unix systems; run precache.py on a unix-based system as file permissions won't transfer to Windows correctly.
+	python precache.py -f /path/to/project.conf
+3) Copy the resulting "precache.list" and your deployment folder to a webserver.
+4) Update PRECACHE_URL in include/vars.h to point to your webhost.
+5) Rebuild the precache binary for each platform you support and distribute this binary to your users.
+	
+	
 CUSTOMIZATION
 
 By editing include/vars.h; you can adjust some variables for precache such as the URL, Window title, etc.
@@ -66,8 +147,13 @@ Application icon: edit the file pertaining to the associated platform.
 	Mac OSX:
 		resources/precache.icns
 		
+Various colors used by the application including button color, button text color, window background color, progress bar colors.
 
-Configuration file example:
+At the top of include/precachelib.h, there are several defines which are useful for further customization and testing.
+
+CONFIGURATION
+
+Configuration files are written in JSON. I'll give a couple examples as I extend the features and try to explain each.
 
 This is a simple config used to specify variables to precache. This assumes an application is for a single platform.
 install_path: The folder to place downloaded content (on a user's machine)
