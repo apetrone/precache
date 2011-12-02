@@ -85,8 +85,11 @@ typedef struct
 	// messages
 	char msg[ 256 ];
 	char msg2[ 256 ];
+	char msg3[ 256 ];
 	unsigned char msg_color[4];
-	int textpos[ 4 ];
+
+	int * closeButtonTextPosition;
+	int * messageTextPositions;
 
 	unsigned char button_color[4];
 	unsigned char button_hover_color[4];
@@ -648,36 +651,39 @@ void tick()
 
 	if ( mouse_inside_button( &state.closeButton ) )
 	{
-		state.closeButton.color[0] = state.button_color[0];
-		state.closeButton.color[1] = state.button_color[1];
-		state.closeButton.color[2] = state.button_color[2];
-	}
-	else
-	{
 		state.closeButton.color[0] = state.button_hover_color[0];
 		state.closeButton.color[1] = state.button_hover_color[1];
 		state.closeButton.color[2] = state.button_hover_color[2];
 	}
-
-
-
-
-	// draw black text to act as a drop-shadow
-	font_draw( &state.font, state.textpos[0]+2, state.textpos[1]+2, state.msg, 0, 0, 0, 255 );
-	if ( state.msg2[0] != 0 )
+	else
 	{
-		font_draw( &state.font, state.textpos[2]+2, state.textpos[3]+2, state.msg2, 0, 0, 0, 255 );
+
+		state.closeButton.color[0] = state.button_color[0];
+		state.closeButton.color[1] = state.button_color[1];
+		state.closeButton.color[2] = state.button_color[2];
 	}
 
-	// draw foreground text
-    font_draw( &state.font, state.textpos[0], state.textpos[1], state.msg, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
+
+
+
+	// draw black text to act as a drop-shadow; then draw full color text
+	font_draw( &state.font, state.messageTextPositions[0]+2, state.messageTextPositions[1]+2, state.msg, 0, 0, 0, 255 );
+	font_draw( &state.font, state.messageTextPositions[0], state.messageTextPositions[1], state.msg, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
+
 	if ( state.msg2[0] != 0 )
 	{
-		font_draw( &state.font, state.textpos[2], state.textpos[3], state.msg2, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
+		font_draw( &state.font, state.messageTextPositions[2]+2, state.messageTextPositions[3]+2, state.msg2, 0, 0, 0, 255 );
+		font_draw( &state.font, state.messageTextPositions[2], state.messageTextPositions[3], state.msg2, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
+	}
+
+	if ( state.msg3[0] != 0 )
+	{
+		font_draw( &state.font, state.messageTextPositions[4]+2, state.messageTextPositions[5]+2, state.msg3, 0, 0, 0, 255 );
+		font_draw( &state.font, state.messageTextPositions[4], state.messageTextPositions[5], state.msg3, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
 	}
 
 	// render button text
-	font_draw( &state.font, 388, 114, "Close", state.button_text_color[0], state.button_text_color[1], state.button_text_color[2], state.button_text_color[3] );
+	font_draw( &state.font, state.closeButtonTextPosition[0], state.closeButtonTextPosition[1], "Close", state.button_text_color[0], state.button_text_color[1], state.button_text_color[2], state.button_text_color[3] );
 
     // do a swap of buffers
 	xwl_finish();
@@ -710,6 +716,15 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	float bar_outline_color[4] = PRECACHE_PROGRESSBAR_OUTLINE_COLOR;
 	float bar_empty_color[4] = PRECACHE_PROGRESSBAR_EMPTY_COLOR;
 	float bar_complete_color[4] = PRECACHE_PROGRESSBAR_COMPLETE_COLOR;
+	int closeButtonTextPosition[2] = PRECACHE_CLOSEBUTTON_TEXT_POSITION;
+
+	int closeButtonPosition[2] = PRECACHE_CLOSEBUTTON_POSITION;
+	int closeButtonSize[2] = PRECACHE_CLOSEBUTTON_SIZE;
+	int windowSize[2] = PRECACHE_WINDOW_SIZE;
+
+	int progressBarPosition[2] = PRECACHE_PROGRESS_BAR_POSITION;
+	int progressBarSize[2] = PRECACHE_PROGRESS_BAR_SIZE;
+	int messageTextPositions[] = PRECACHE_MESSAGE_POSITIONS;
 #if !PRECACHE_TEST
 	char temp_path[ MAX_PATH_SIZE ];
 #else
@@ -724,26 +739,19 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 
     /* setup button */
 	state.closeButton.event = cmd_quit;
-	state.closeButton.width = 70;
-	state.closeButton.height = 25;
-	state.closeButton.x = 365;
-	state.closeButton.y = 95;
+	state.closeButton.width = closeButtonSize[0];
+	state.closeButton.height = closeButtonSize[1];
+	state.closeButton.x = closeButtonPosition[0];
+	state.closeButton.y = closeButtonPosition[1];
 
 
 	// setup progress bar
 	state.bar.event = 0;
-	state.bar.x = 25;
-	state.bar.y = 60;
-	state.bar.height = 15;
+	state.bar.x = progressBarPosition[0];
+	state.bar.y = progressBarPosition[1];
 	state.bar.width = 1;
-
-
-	// setup text position
-	state.textpos[0] = 30;
-	state.textpos[1] = 25;
-	state.textpos[2] = 30;
-	state.textpos[3] = 45;
-
+	state.bar.height = progressBarSize[1];
+	
 	// convert colors
 	float_color_to_char( button_color, state.button_color );
 	float_color_to_char( button_hover_color, state.button_hover_color );
@@ -753,7 +761,11 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	float_color_to_char( bar_empty_color, state.bar_empty_color );
 	float_color_to_char( bar_complete_color, state.bar_complete_color );
 
-	state.progressBarWidth = 400;
+	// set positions
+	state.closeButtonTextPosition = closeButtonTextPosition;
+	state.messageTextPositions = messageTextPositions;
+
+	state.progressBarWidth = progressBarSize[0];
 	state.downloadPercent = 0;
 
 #if PRECACHE_TEST
@@ -849,8 +861,9 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
         printf( "----------------------\n" );
     }
 
-    p.width = 450;
-    p.height = 130;
+	
+    p.width = windowSize[0];
+    p.height = windowSize[1];
     p.flags = XWL_OPENGL | XWL_WINDOWED | XWL_NORESIZE;
 
 #if _WIN32
@@ -884,6 +897,9 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 #if PRECACHE_TEST
 	strcpy( state.msg, "PRECACHE_TEST is enabled..." );
 
+	strcpy( state.msg2, "Message 2 Text" );
+
+	strcpy( state.msg3, "Message 3 Text" );
 #if 0
 	if ( platform_is64bit() )
 	{

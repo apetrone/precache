@@ -87,20 +87,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PRECACHE_LIST_UPDATELIST "updaters"
 #define PRECACHE_LIST_CHMOD "mode"
 
-/*
-Example: precache.conf
-/////////////////////////////////////////////
-
-{
-	"deploysource" : "test",
-	"localpath" : "folder",
-	"remotepath" : "test"
-}
-
-/////////////////////////////////////////////
-*/
-
-
 
 #if _WIN32
     #define MAX_PATH_SIZE MAX_PATH
@@ -264,4 +250,5 @@ int precache_should_update_self( precache_state_t * precache );
 int precache_mode_string_to_integer( const char * mode );
 #endif
 
+// convert RGBA float to RGBA unsigned char
 void float_color_to_char( float * colors, unsigned char * out );
