@@ -911,12 +911,6 @@ int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmd
 	}
 #endif
 
-	buffer = allocate_file_buffer( "precache.list", &bufferSize );
-	precache_parse_listbuffer( &state.ps, buffer, bufferSize );
-	if ( buffer )
-	{
-		free( buffer );
-	}
 #else
 	strcpy( state.msg, "Downloading precache.list..." );
 	mutex_create( &state.dl );
