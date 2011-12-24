@@ -1145,9 +1145,10 @@ xwl_window_t *xwl_create_window( xwl_windowparams_t *params, const char * title,
 		return 0;
 	}
 
-	clientrect.left = 0;
+	// Match OSX behaviour and center window
+	clientrect.left = (GetSystemMetrics(SM_CXSCREEN) - params->width)/2;
 	clientrect.right = params->width;
-	clientrect.top = 0;
+	clientrect.top = (GetSystemMetrics(SM_CYSCREEN) - params->height)/2;
 	clientrect.bottom = params->height;
 	// ATI driver bug? from irrlicht
 	MoveWindow( handle, clientrect.left, clientrect.top, clientrect.right, clientrect.bottom, 1 );
