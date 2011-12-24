@@ -698,11 +698,7 @@ void tick()
 
 
 
-#ifndef _WIN32
 int main()
-#else
-int __stdcall WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd )
-#endif
 {
     xwl_window_t * window = 0;
 	xwl_windowparams_t p;
