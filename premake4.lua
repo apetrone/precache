@@ -62,6 +62,7 @@ project "precache"
 		defines { "LINUX=1", baseDefines }
 		links
 		{
+			"pthread",
 			"Xinerama",
 			"X11",
 			"GL"
