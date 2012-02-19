@@ -1,0 +1,6 @@
+.DS_Store
+*.pyc
+Makefile
+*.make
+build/
+obj/
