@@ -48,6 +48,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // if > 0, will attempt to remove the precache.log on exit
 #define PRECACHE_CLEANUP_LOG 0
 
+// if > 0, will show filenames when downloading
+#define PRECACHE_SHOW_FILENAME 1
+
 // define as > 0 to testing
 // define as 0 for normal operations
 #define PRECACHE_TEST 0
@@ -203,6 +206,9 @@ typedef struct precache_state_s
     char currentfilepath[ MAX_PATH_SIZE ];
     char err1[1024];
     char err2[1024];
+
+    int file_count;
+    int file_index;
 
     precache_file_t * files;
     precache_file_t * curfile;

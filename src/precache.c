@@ -567,14 +567,27 @@ void process_downloads()
 			{
 				log_msg( "Error occurred while downloading. bytes_read is < 0!\n" );
 			}
+
+#if PRECACHE_SHOW_FILENAME
 			sprintf( state.msg, "Downloading \"%s\"", state.ps.curfile->path );
+#else
+			sprintf( state.msg, "Downloading %i of %i", state.ps.file_index, state.ps.file_count );
+#endif
 			sprintf( state.msg2, "Progress: (%iKB/%iKB)", state.downloadState.bytes_read/KB_DIV, state.downloadState.content_length/KB_DIV );
 			set_msg_color( 255, 255, 255, 255 );
 		}
 	}
 	else if ( state.ps.state == PS_FINISHED_PARSING_LIST )
 	{
+		precache_file_t * file;
 		log_msg( "* finished parsing precache.list, beginning downloads\n" );
+
+		for ( file = state.ps.files; file; file = file->next )
+		{
+			state.ps.file_count++;
+		}
+		// don't count precache.conf
+		state.ps.file_count--;
 
 		state.ps.curfile = state.ps.files;
 		// finished analysis, resume normal downloading state
@@ -595,6 +608,7 @@ void process_downloads()
 		else
 		{
 			state.ps.state = PS_DOWNLOADING;
+			state.ps.file_index++;
 			// initiate download
 			thread_stop( &state.t0 );
 			state.tdata.state = PRECACHE_STATE_DOWNLOAD_REQUEST;
@@ -617,7 +631,12 @@ void process_downloads()
 		{
 			log_msg( "Error occurred while downloading. bytes_read is < 0!\n" );
 		}
+
+#if PRECACHE_SHOW_FILENAME
 		sprintf( state.msg, "Downloading \"%s\"", state.ps.curfile->path );
+#else
+		sprintf( state.msg, "Downloading %i of %i", state.ps.file_index, state.ps.file_count );
+#endif
 		sprintf( state.msg2, "Progress: (%iKB/%iKB)", state.downloadState.bytes_read/KB_DIV, state.downloadState.content_length/KB_DIV );
 		set_msg_color( 255, 255, 255, 255 );
 
