@@ -2,6 +2,7 @@
 import os
 import sys
 import string
+import array
 
 import json
 
@@ -239,3 +240,33 @@ for (key,value) in app_config.items():
 		out.write('"'+str(value)+'"\n')
 
 out.close()
+
+# Save the provided image encoded into include/image.h
+if cfg["app"].has_key( "window_image" ):
+	image_path = os.path.join( cfg['abs_target_path'],cfg["app"]["window_image"] )
+
+	# Read in as byte array
+	f = open( image_path, "r" )
+	bytes = array.array( 'B', f.read() )
+	f.close()
+
+	out = open( os.path.join( os.getcwd(), "include/image.h" ), "w" )
+	out.write( "static const unsigned char PRECACHE_WINDOW_IMAGE[] = {\n" )
+
+	i = 0
+	count = len( bytes )
+	for byte in bytes:
+		if ( i % 12 ) == 0:
+			out.write( "\t0x%02x, " % byte )
+		elif ( i % 12 ) == 11:
+			out.write( "0x%02x,\n" % byte )
+		else:
+			out.write( "0x%02x, " % byte )
+		i+=1
+	out.write("\n};\n")
+	out.close()
+
+else:
+	out = open( os.path.join( os.getcwd(), "include/image.h" ), "w" )
+	out.write( "static const unsigned char* PRECACHE_WINDOW_IMAGE = 0;\n" )
+	out.close()

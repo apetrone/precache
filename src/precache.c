@@ -47,6 +47,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#include <GL/glx.h>
 #endif
 
+#define STBI_HEADER_FILE_ONLY
+#include "stb_image.c"
+#include "image.h"
+
 #include <xwl/xwl.h>
 #include <thread.h>
 #include "font.h"
@@ -75,6 +79,7 @@ typedef struct
 	http_download_state_t downloadState;
 
 	// rendering related
+	GLint background;
 	button bar;
 	button closeButton;
 	short progressBarWidth;
@@ -188,6 +193,53 @@ void callback( xwl_event_t * e )
 	if ( e->type == XWLE_KEYRELEASED && e->key == XWLK_ESCAPE )
 	{
 		state.running = 0;
+	}
+}
+
+void background_load_embedded()
+{
+	if ( PRECACHE_WINDOW_IMAGE ) {
+		const int len = sizeof(PRECACHE_WINDOW_IMAGE)/sizeof(PRECACHE_WINDOW_IMAGE[0]);
+		int w, h, bpp;
+		stbi_uc* data = stbi_load_from_memory( PRECACHE_WINDOW_IMAGE, len, &w, &h, &bpp, STBI_rgb);
+
+		if (data) {
+			glGenTextures(1, &state.background );
+			glBindTexture( GL_TEXTURE_2D, state.background );
+			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+			glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB8, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, data );
+			stbi_image_free( data );
+		}
+	}
+}
+
+void render_background()
+{
+	float backgroundColor[4] = PRECACHE_WINDOW_BACKGROUND_COLOR;
+
+	if ( PRECACHE_WINDOW_IMAGE ) {
+		glColor3ub( 255, 255, 255 );
+		glEnable( GL_TEXTURE_2D );
+		glBindTexture( GL_TEXTURE_2D, state.background );
+		glBegin( GL_TRIANGLES );
+		glTexCoord2f( 0, 0 );
+		glVertex2i( 0, 0 );
+		glTexCoord2f( 0, 1 );
+		glVertex2i( 0, state.height );
+		glTexCoord2f( 1, 1 );
+		glVertex2i( state.width, state.height );
+		glTexCoord2f( 1, 1 );
+		glVertex2i( state.width, state.height );
+		glTexCoord2f( 1, 0 );
+		glVertex2i( state.width, 0 );
+		glTexCoord2f( 0, 0 );
+		glVertex2i( 0, 0 );
+		glEnd();
+		glDisable( GL_TEXTURE_2D );
+	} else {
+		glClearColor( backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] );
+		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	}
 }
 
@@ -624,13 +676,8 @@ void process_downloads()
 
 void tick()
 {
-	float backgroundColor[4] = PRECACHE_WINDOW_BACKGROUND_COLOR;
+	xwl_pollevent( &state.event );
 
-    xwl_pollevent( &state.event );
-
-
-	glClearColor( backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] );
-	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	glViewport( 0, 0, state.width, state.height );
 
 	glMatrixMode( GL_PROJECTION );
@@ -640,6 +687,8 @@ void tick()
 
 	glMatrixMode( GL_MODELVIEW );
 	glLoadIdentity();
+
+	render_background();
 
 	state.bar.width = (i16)(state.downloadPercent * state.progressBarWidth);
 
@@ -881,6 +930,8 @@ int main()
 	state.width = p.width;
 	state.height = p.height;
     xwl_set_callback( callback );
+
+    background_load_embedded();
 
     // init font
     //font_load_embedded( &state.font, font_liberation_mono8, font_liberation_mono8_size );
