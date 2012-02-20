@@ -157,25 +157,20 @@ You have a deployment folder that you want to distribute to users, players, test
 	NOTE: If you're supporting unix systems; run precache.py on a unix-based system as file permissions won't transfer to Windows correctly.
 	python precache.py -f /path/to/project.conf
 3) Copy the resulting "precache.list" and your deployment folder to a webserver.
-4) Update PRECACHE_URL in include/vars.h to point to your webhost.
-5) Rebuild the precache binary for each platform you support and distribute this binary to your users.
-	
-	
+4) Rebuild the precache binary for each platform you support and distribute this binary to your users.
+
+
 CUSTOMIZATION
 
-By editing include/vars.h; you can adjust some variables for precache such as the URL, Window title, etc.
-
-Application icon: edit the file pertaining to the associated platform. 
-	You can create new icons using png2ico (Windows), Icon Composer (Mac OSX). 
+Application icon: edit the file pertaining to the associated platform.
+	You can create new icons using png2ico (Windows), Icon Composer (Mac OSX).
 	Simply replace the file and build the binary again.
 
 	Windows:
 		resources/precache.ico
-		
+
 	Mac OSX:
 		resources/precache.icns
-		
-Various colors used by the application including button color, button text color, window background color, progress bar colors.
 
 At the top of include/precachelib.h, there are several defines which are useful for further customization and testing.
 
@@ -189,6 +184,9 @@ remote_project_path: The path on the remote server where the content will be hos
 	In this example, if precache pointed to "http://localhost", then files should be located in "http://localhost/build1234/"
 local_project_path: Used for generating precache.list; the folder, on your deployment machine which runs precache.py, where the application content root is.
 	In this example: "project" is a folder which contains "precache.conf", and a folder: "deploy". Deploy is used as a root for content.
+app: A list of settings used to generate include/vars.h, see precache.py for default values.
+	In this example, "url" specifies the remote download source, and a "window_title" is set.
+	Also available for configuration are various colors used by the application including button color, button text color, window background color, progress bar colors.
 excludes: A list of ignores that are applied when walking the local_project_path
 
 ----------------
@@ -196,8 +194,14 @@ excludes: A list of ignores that are applied when walking the local_project_path
 	"install_path" : "appname",
 	"remote_project_path" : "build1234",
 	"local_project_path" : "deploy",
-	
-	"excludes" : 
+
+	"app" :
+	{
+		"url": "http://localhost/project/",
+		"window_title": "Project"
+	}
+
+	"excludes" :
 	[
 		"*.dSYM/*",
 		"*.DS_Store"
@@ -210,22 +214,28 @@ Here is another configuration file which is platform aware - meaning it only syn
 
 deploy contains a folder "bin", which contains three folders, one for each platform "windows", "linux", "macosx".
 
-binary_path: Used in this example to specify a binary root path which all binaries are synced to on the local machine. 
-	It is needed because relative paths are resolved and would ordinarily be placed in the paths listed in "binaries". 
+binary_path: Used in this example to specify a binary root path which all binaries are synced to on the local machine.
+	It is needed because relative paths are resolved and would ordinarily be placed in the paths listed in "binaries".
 	Instead, we want them to appear in a more generic "bin" folder inside our project folder.
-----------------	
+----------------
 {
 	"install_path" : "appname",
 	"remote_project_path" : "build1234",
 	"local_project_path" : "deploy",
 	"binary_path" : "bin",
-	
-	"excludes" : 
+
+	"app" :
+	{
+		"url": "http://localhost/project/",
+		"window_title": "Project"
+	}
+
+	"excludes" :
 	[
 		"*.dSYM/*",
 		"*.DS_Store"
 	],
-	
+
 	"binaries" :
 	{
 		"windows" : "bin/windows"

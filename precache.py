@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import sys
+import string
 
 import json
 
@@ -25,7 +26,7 @@ ignore_list = []
 updaters = None
 
 if __name__ == "__main__":
-	p = argparse.ArgumentParser( description='Generate precache.list for a project' )
+	p = argparse.ArgumentParser( description='Generate precache.list and vars.h for a project' )
 	p.add_argument( '-f', '--file', dest='config_file', metavar='CONFIG_FILE', required=True )
 	cmdline = p.parse_args()
 
@@ -36,7 +37,12 @@ config_path = os.path.normpath( cmdline.config_file )
 
 if file_exists( config_path ):
 	print( 'Loading configuration from %s...' % config_path )
-	cfg = load_config( config_path )
+
+	try:
+		cfg = load_config( config_path )
+	except ValueError as e:
+		print('error: '+str(e))
+		sys.exit(1)
 
 	cfg['abs_target_path'] = os.path.normpath( os.path.abspath( os.path.dirname( cmdline.config_file ) ) )
 	#print( 'Absolute target path: %s' % cfg['abs_target_path'] )
@@ -191,4 +197,44 @@ jsondata = json.dumps(output, indent=4, sort_keys=True)
 print( 'Writing precache file: %s' % cfg['output_file'] )
 out = open( cfg['output_file'], 'wb' )
 out.write( jsondata )
+out.close()
+
+# Defaults
+app_config = {
+	"url":                        "http://localhost/project/",
+	"window_title":               "Precache Download Test",
+	"window_size":                [505, 195],
+	"window_background_color":    [0.2, 0.23, 0.26, 1.0],
+	"button_color":	              [0.12, 0.156, 0.188, 1],
+	"button_hover_color":         [0.31, 0.34, 0.36, 1],
+	"button_text_color":          [0.80, 0.8, 0.8, 1.0],
+	"progress_bar_position":      [30, 89],
+	"progress_bar_size":          [440, 15],
+	"progressbar_outline_color":  [0.12, 0.156, 0.188, 1.0],
+	"progressbar_empty_color":    [0.12, 0.156, 0.188, 1.0],
+	"progressbar_complete_color": [0.164, 0.55, 0.796, 1.0],
+	"closebutton_text_position":  [437, 166],
+	"closebutton_position":	      [408, 146],
+	"closebutton_size":           [81, 32],
+	"message_positions":          [32, 35, 32, 55, 32, 118]
+}
+
+# Overwrite only existing settings
+if cfg.has_key("app"):
+	for key in app_config.keys():
+		if cfg["app"].has_key(key):
+			app_config[key] = cfg["app"][key]
+
+out = open(os.path.join(os.getcwd(), "include/vars.h"), "w")
+
+for (key,value) in app_config.items():
+	out.write('#define PRECACHE_'+string.ljust(key.upper(),32)+' ')
+	if type(value) is list:
+		out.write('{'+str(value[0]))
+		for v in value[1:]:
+			out.write(', '+str(v))
+		out.write('}\n')
+	else:
+		out.write('"'+str(value)+'"\n')
+
 out.close()
