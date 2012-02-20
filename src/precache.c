@@ -667,18 +667,18 @@ void tick()
 
 
 	// draw black text to act as a drop-shadow; then draw full color text
-	font_draw( &state.font, state.messageTextPositions[0]+2, state.messageTextPositions[1]+2, state.msg, 0, 0, 0, 255 );
+	font_draw( &state.font, state.messageTextPositions[0]+1, state.messageTextPositions[1]+1, state.msg, 0, 0, 0, 255 );
 	font_draw( &state.font, state.messageTextPositions[0], state.messageTextPositions[1], state.msg, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
 
 	if ( state.msg2[0] != 0 )
 	{
-		font_draw( &state.font, state.messageTextPositions[2]+2, state.messageTextPositions[3]+2, state.msg2, 0, 0, 0, 255 );
+		font_draw( &state.font, state.messageTextPositions[2]+1, state.messageTextPositions[3]+1, state.msg2, 0, 0, 0, 255 );
 		font_draw( &state.font, state.messageTextPositions[2], state.messageTextPositions[3], state.msg2, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
 	}
 
 	if ( state.msg3[0] != 0 )
 	{
-		font_draw( &state.font, state.messageTextPositions[4]+2, state.messageTextPositions[5]+2, state.msg3, 0, 0, 0, 255 );
+		font_draw( &state.font, state.messageTextPositions[4]+1, state.messageTextPositions[5]+1, state.msg3, 0, 0, 0, 255 );
 		font_draw( &state.font, state.messageTextPositions[4], state.messageTextPositions[5], state.msg3, state.msg_color[0], state.msg_color[1], state.msg_color[2], state.msg_color[3] );
 	}
 
