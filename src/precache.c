@@ -683,7 +683,7 @@ void tick()
 	}
 
 	// render button text
-	font_draw( &state.font, state.closeButtonTextPosition[0], state.closeButtonTextPosition[1], "Close", state.button_text_color[0], state.button_text_color[1], state.button_text_color[2], state.button_text_color[3] );
+	font_draw( &state.font, state.closeButtonTextPosition[0], state.closeButtonTextPosition[1], PRECACHE_CLOSEBUTTON_TITLE, state.button_text_color[0], state.button_text_color[1], state.button_text_color[2], state.button_text_color[3] );
 
     // do a swap of buffers
 	xwl_finish();

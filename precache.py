@@ -213,6 +213,7 @@ app_config = {
 	"progressbar_outline_color":  [0.12, 0.156, 0.188, 1.0],
 	"progressbar_empty_color":    [0.12, 0.156, 0.188, 1.0],
 	"progressbar_complete_color": [0.164, 0.55, 0.796, 1.0],
+	"closebutton_title":          "Close",
 	"closebutton_text_position":  [437, 166],
 	"closebutton_position":	      [408, 146],
 	"closebutton_size":           [81, 32],
