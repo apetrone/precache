@@ -3,6 +3,7 @@ import os
 import sys
 import string
 import array
+import shutil
 
 import json
 
@@ -270,3 +271,22 @@ else:
 	out = open( os.path.join( os.getcwd(), "include/image.h" ), "w" )
 	out.write( "static const unsigned char* PRECACHE_WINDOW_IMAGE = 0;\n" )
 	out.close()
+
+# Copy icons
+if 'icons' in cfg:
+
+	if 'windows' in cfg['icons']:
+		src = os.path.join( cfg['abs_target_path'], cfg['icons']['windows'] )
+		dst = os.path.join( os.getcwd(), "resources/precache.ico" )
+		try:
+			shutil.copyfile(src, dst)
+		except IOError as e:
+			print('error: '+str(e))
+
+	if 'macosx' in cfg['icons']:
+		src = os.path.join( cfg['abs_target_path'], cfg['icons']['macosx'] )
+		dst = os.path.join( os.getcwd(), "resources/precache.icns" )
+		try:
+			shutil.copyfile(src, dst)
+		except IOError as e:
+			print('error: '+str(e))
