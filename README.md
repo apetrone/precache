@@ -1,13 +1,13 @@
 ### Precache
 
-Precache is a cross-platform program for application distribution over HTTP. It is inspired by Mojang's Minecraft and other similar systems.
+Precache is a cross-platform program for application distribution over HTTP. It is inspired by Mojang's Minecraft downloader and other similar systems.
 
 
 The design goals are:
 
--	cross-platform among Linux, Windows, and MacOSX.
+-	cross-platform among Linux, Windows, and Mac OS X.
 -	Ease of use. Config files are written in JSON.
--	little or no external dependencies ([xwl](http://github.com/apetrone/xwl) and soon [libcurl](http://github.com/bagder/curl))
+-	little or no external dependencies ([xwl](http://github.com/apetrone/xwl) and [libcurl](http://github.com/bagder/curl))
 -	favor the smallest binary possible. Fonts are embedded and a simple font renderer is included.
 
 ### Contributors
@@ -19,28 +19,37 @@ The design goals are:
 -	The User Interface is very simplistic - again to reduce external dependencies. The source is available, so a developer could always hook up their own GUI in place of the minimalistic one.
 -	Currently, only connections through HTTP are supported. I have tested with the following servers: Apache 2.2.16 (linux), nginx 1.1.8 (windows), Lighttpd 1.4.10 (windows). A plan is in the works to move this to libcurl.
 -	It is very important precache.py is executed on a unix-based platform when generating precache.list for unix platforms to maintain file permissions
--	XWLE_TEXT events on Linux only generate ASCII equivalent Unicode values.
 
 
 ### Building
 
-The code should successfully build under Linux, Windows, and Mac OSX 10.6.x+
+The code should successfully build under Linux, Windows, and Mac OS X 10.6.x+
 
 It uses the [Premake](http://industriousone.com/premake "premake") build system which allows me enough control while balancing maintenance of the premake script.
 Simply run premake4 from the command line to generate your favorite project files.
 
 I have tested the following project files under the respective OS.
 
+#### git submodules
+-	This makes use of git submodules. When building, cd to the root and then run:
+
+		git submodule init
+		git submodule update
+
 #### Linux
+		premake4 codeblocks
+
 -	Dependencies: mesa-common-dev libxrandr-dev libxinerama-dev libgl1-mesa-dev
 
->	premake4 codeblocks
-
-#### Mac OSX
->	premake4 xcode3
+#### Mac OS X
+		premake4 xcode3
 
 #### Windows
->	premake4 vs2008/vs2010
+		premake4 vs2008
+
+or
+
+		premake4 vs2010
 
 ##### Project dependency on xwl:
 -	This is included in the precache source, but may one day be removed (and re-added as a submodule) as it has its own github project: http://github.com/apetrone/xwl/. Be aware that it is a dependency for window code.
@@ -56,9 +65,9 @@ You have a deployment folder that you want to distribute to users, players, test
 2.	Run the precache.py script and specify the configuration file you just created.
 3.	If you're supporting unix systems; run precache.py from a unix-based system. File permissions would be lost if you copy files and run precache.py from Windows.
 
->
->	python precache.py -f /path/to/project.conf
->
+
+		python precache.py -f /path/to/project.conf
+
 
 4.	Copy the resulting "precache.list" and your deployment folder to a webserver.
 5.	Rebuild the precache binary for each platform you support and distribute this binary to your users.
@@ -67,14 +76,16 @@ You have a deployment folder that you want to distribute to users, players, test
 ### Customization
 
 -	Application icon: edit the file pertaining to the associated platform.
-	You can create new icons using png2ico (Windows), Icon Composer (Mac OSX).
+	You can create new icons using png2ico (Windows), Icon Composer (Mac OS X).
 	Simply replace the file and build the binary again.
 
 -	Windows:
->	resources/precache.ico
 
--	Mac OSX:
->	resources/precache.icns
+		resources/precache.ico
+
+-	Mac OS X:
+
+		resources/precache.icns
 
 At the top of include/precachelib.h, there are several defines which are useful for further customization and testing.
 

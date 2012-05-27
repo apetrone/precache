@@ -1,0 +1,3 @@
+[submodule "dependencies/curl"]
+	path = dependencies/curl
+	url = git://github.com/bagder/curl.git
