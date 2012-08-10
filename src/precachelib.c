@@ -54,7 +54,12 @@ int parse_json( void *ctx, int type, const JSON_value * value )
 					{
 						ps->state->curfile->extra_flags = (int)value->vu.integer_value;
 					}
+					else if ( stricmp( ps->lastkey, PRECACHE_LIST_FILESIZE ) == 0 )
+					{
+						ps->state->curfile->filesize = (size_t)value->vu.integer_value;
+					}					
 				}
+				
             }
             break;
         case JSON_T_ARRAY_BEGIN:
@@ -489,6 +494,40 @@ int precache_mode_string_to_integer( const char * mode )
 
 	return value;
 } // precache_mode_string_to_integer
+
+void precache_mode_integer_to_string( int mode, char * permissions )
+{
+	char owner, group, others;
+	owner = group = others = '0';
+	
+	// permissions for owner
+	if ( mode & S_IRUSR )
+		owner += 4;
+	if ( mode & S_IWUSR )
+		owner += 2;
+	if ( mode & S_IXUSR )
+		owner += 1;
+	
+	// permissions for group
+	if ( mode & S_IRGRP )
+		group += 4;
+	if ( mode & S_IWGRP )
+		group += 2;
+	if ( mode & S_IXGRP )
+		group += 1;
+	
+	// permissions for others
+	if ( mode & S_IROTH )
+		others += 4;
+	if ( mode & S_IWOTH )
+		others += 2;
+	if ( mode & S_IXOTH )
+		others += 1;
+	
+	permissions[0] = owner;
+	permissions[1] = group;
+	permissions[2] = others;
+}
 #endif
 
 

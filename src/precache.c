@@ -24,6 +24,15 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+
+
+// use curl instead of home-grown http library
+#define USE_CURL 1
+
+#if USE_CURL
+	#include <curl/curl.h>
+#endif
+
 #include <stdio.h>
 
 #if _WIN32
@@ -46,6 +55,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#include <GL/gl.h>
 	#include <GL/glx.h>
 #endif
+
+
 
 #define STBI_HEADER_FILE_ONLY
 #include "stb_image.c"
@@ -196,14 +207,16 @@ void callback( xwl_event_t * e )
 	}
 }
 
-void background_load_embedded()
+void background_load_embedded( void )
 {
-	if ( PRECACHE_WINDOW_IMAGE ) {
+	if ( PRECACHE_WINDOW_IMAGE )
+	{
 		const int len = sizeof(PRECACHE_WINDOW_IMAGE)/sizeof(PRECACHE_WINDOW_IMAGE[0]);
 		int w, h, bpp;
 		stbi_uc* data = stbi_load_from_memory( PRECACHE_WINDOW_IMAGE, len, &w, &h, &bpp, STBI_rgb);
 
-		if (data) {
+		if (data)
+		{
 			glGenTextures(1, &state.background );
 			glBindTexture( GL_TEXTURE_2D, state.background );
 			glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
@@ -214,11 +227,21 @@ void background_load_embedded()
 	}
 }
 
+void background_destroy( void )
+{
+	if ( PRECACHE_WINDOW_IMAGE )
+	{
+		glBindTexture( GL_TEXTURE_2D, 0 );
+		glDeleteTextures( 1, &state.background );
+	}
+}
+
 void render_background()
 {
 	float backgroundColor[4] = PRECACHE_WINDOW_BACKGROUND_COLOR;
 
-	if ( PRECACHE_WINDOW_IMAGE ) {
+	if ( PRECACHE_WINDOW_IMAGE )
+	{
 		glColor3ub( 255, 255, 255 );
 		glEnable( GL_TEXTURE_2D );
 		glBindTexture( GL_TEXTURE_2D, state.background );
@@ -237,7 +260,9 @@ void render_background()
 		glVertex2i( 0, 0 );
 		glEnd();
 		glDisable( GL_TEXTURE_2D );
-	} else {
+	}
+	else
+	{
 		glClearColor( backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] );
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 	}
@@ -299,20 +324,199 @@ void render_progress_bar( button * bar, int progressBarWidth, unsigned char * bg
 	render_button_frame( bar, progressBarWidth, bar->height, outline_color );
 }
 
-static g_thread_id = 0;
+static int g_thread_id = 0;
 
-THREAD_ENTRY precache_download_thread( void * data )
+
+typedef struct precache_download_context_s
+{
+	http_download_state_t * download;
+	FILE * filehandle;
+} precache_download_context_t;
+
+#if USE_CURL
+size_t write_data( void *ptr, size_t size, size_t nmemb, void * userdata )
+{
+	precache_download_context_t * ctx = (precache_download_context_t*)userdata;
+	size_t written = fwrite( ptr, size, nmemb, ctx->filehandle );
+	ctx->download->bytes_read += written;
+	return written;
+}
+
+
+THREAD_ENTRY precache_download_thread_curl( void * data )
 {
     precache_thread_data_t * td = (precache_thread_data_t*)data;
     http_download_state_t * download = td->download;
     precache_state_t * precache = td->precache;
+
+	CURL * curl;
+	CURLcode curl_result;
+	precache_download_context_t download_context;
+
     char remotepath[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
     char localpath[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
 	float dt;
 	int thread_id;
 	int last_bytes;
 	float last_read;
+	
+	int http_status;
+	FILE * filehandle;
+#if LINUX || __APPLE__
+	int result;
+#endif
+	
+    if ( !td || !download || !precache )
+        return 0;
+	
 
+	
+	last_bytes = 0;
+	last_read = timer_ms(&state.ts);
+	memset( download, 0, sizeof(http_download_state_t) );
+	
+	thread_id = g_thread_id;
+	THREAD_MSG( "-> T: Entering Thread (%i)...\n", g_thread_id );
+	g_thread_id++;	
+
+	
+	while( td->state != PRECACHE_STATE_EXIT && td->state != PRECACHE_STATE_ERROR )
+	{
+//	    mutex_lock( &state.dl );
+	
+		if ( td->state == PRECACHE_STATE_DOWNLOAD_REQUEST )
+        {
+			if ( precache->curfile )
+			{
+				mutex_lock( &state.dl );
+				precache->curfile->timestamp = timer_ms(&state.ts);
+				
+				// construct remote path
+				memset( remotepath, 0, PRECACHE_TEMP_BUFFER_SIZE );
+				strcpy( remotepath, precache->remotepath );
+				strcat( remotepath, precache->curfile->path );
+				
+				// construct local path
+				memset( localpath, 0, PRECACHE_TEMP_BUFFER_SIZE );
+				strcpy( localpath, precache->localpath );
+				strcat( localpath, precache->curfile->targetpath );
+				platform_conform_slashes( localpath, PRECACHE_TEMP_BUFFER_SIZE );
+				
+				download->content_length = precache->curfile->filesize;
+				THREAD_MSG( "-> T: %i - Requesting a new file [remotepath=%s, localpath=%s, filesize=%lu]\n", thread_id, remotepath, localpath, download->content_length );
+				
+				
+				
+				platform_makedirs( localpath );
+				
+				// open temporary file
+				filehandle = fopen( localpath, "wb" );
+				if ( filehandle == 0 )
+				{
+					printf( "* HTTP: Error opening \"%s\"!\n", localpath );
+				}
+				
+				download_context.download = download;
+				download_context.filehandle = filehandle;	
+				
+				log_msg( "* preparing a GET request with cURL...\n" );
+				curl = curl_easy_init();
+				curl_easy_setopt( curl, CURLOPT_VERBOSE, 0 );
+				curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, write_data );
+				curl_easy_setopt( curl, CURLOPT_WRITEDATA, &download_context );
+				curl_easy_setopt( curl, CURLOPT_URL, remotepath );
+				
+				mutex_unlock( &state.dl );
+				
+				curl_result = curl_easy_perform( curl );
+				
+				mutex_lock( &state.dl );
+				download->completed = 1;
+				fclose( filehandle );
+				
+				curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_status );
+				log_msg( "* http status code: %i\n", http_status );
+				
+				if ( curl_result == 0 )
+				{
+					log_msg( "* download completed.\n" );
+				}
+				else
+				{
+					log_msg( "* download failed\n" );
+					download->completed = 0;
+				}
+				
+				log_msg( "* cURL cleanup\n" );
+				curl_easy_cleanup( curl );
+				
+				td->state = PRECACHE_STATE_DOWNLOAD;
+				mutex_unlock( &state.dl );
+			}			
+		}
+		
+		if ( td->state != PRECACHE_STATE_EXIT )
+		{
+			if( download->error || download->completed )
+			{
+				mutex_lock( &state.dl );
+				if ( download->completed )
+				{
+					THREAD_MSG( "-> T: %i - download complete!\n", thread_id );
+					
+					// set permissions on this file
+#if LINUX || __APPLE__
+					char modestr[4] = {0};
+					precache_mode_integer_to_string( precache->curfile->mode, modestr );
+					log_msg( "* Set permissions (%s) on file (%s)... \n", modestr, localpath );
+					result = chmod( localpath, precache->curfile->mode );
+					
+					if ( result != 0 )
+					{
+						log_msg( "* chmod failed with errno: %i\n", errno );
+					}
+#endif
+					
+				}
+				else
+				{
+					THREAD_MSG( "-> T: %i - Unable to download file: %s\n", thread_id, remotepath );
+					strcpy( precache->err1, "Update failed! File not found:" );
+					strcpy( precache->err2, remotepath );
+				}
+				
+				td->state = PRECACHE_STATE_EXIT;
+				mutex_unlock( &state.dl );
+			}
+		}
+		
+//        mutex_unlock( &state.dl );
+	}
+	
+	THREAD_MSG( "-> T: %i - Leaving Thread.\n", thread_id );
+	
+	return 0;
+}
+#endif
+
+THREAD_ENTRY precache_download_thread( void * data )
+{
+    precache_thread_data_t * td = (precache_thread_data_t*)data;
+    http_download_state_t * download = td->download;
+    precache_state_t * precache = td->precache;
+#if USE_CURL
+	CURL * curl;
+	CURLcode curl_result;
+#endif
+    char remotepath[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
+    char localpath[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
+	float dt;
+	int thread_id;
+	int last_bytes;
+	float last_read;
+	
+	int http_status;
+	FILE * filehandle;
 #if LINUX || __APPLE__
 	int result;
 #endif
@@ -328,6 +532,9 @@ THREAD_ENTRY precache_download_thread( void * data )
 	THREAD_MSG( "-> T: Entering Thread (%i)...\n", g_thread_id );
 	g_thread_id++;
 
+	
+
+	
 	while( td->state != PRECACHE_STATE_EXIT && td->state != PRECACHE_STATE_ERROR )
 	{
 	    mutex_lock( &state.dl );
@@ -378,7 +585,8 @@ THREAD_ENTRY precache_download_thread( void * data )
 
 				THREAD_MSG( "-> T: %i - Requesting a new file [remotepath=%s, localpath=%s]\n", thread_id, remotepath, localpath );
 
-				http_download_file( remotepath, localpath, PRECACHE_USER_AGENT, download );
+				http_download_file( remotepath, localpath, PRECACHE_USER_AGENT, download );				
+
 				td->state = PRECACHE_STATE_DOWNLOAD;
 			}
         }
@@ -480,7 +688,7 @@ THREAD_ENTRY precache_calculate_checksums( void * data )
 
 
 void process_downloads()
-{
+{	
 	mutex_lock( &state.dl );
 	if ( state.ps.state == PS_DOWNLOAD_LIST && state.downloadState.completed )
 	{
@@ -505,20 +713,20 @@ void process_downloads()
 
                 // ensure this directory exists..
 #if 0
-#if LINUX || __APPLE__
-                // http://pubs.opengroup.org/onlinepubs/009695399/functions/mkdir.html
-                mkdir( state.ps.localpath, (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH ) );
-#else
-				platform_conform_slashes( state.ps.localpath, MAX_PATH_SIZE );
-				created_directory = CreateDirectoryA( state.ps.localpath, 0 );
+	#if LINUX || __APPLE__
+					// http://pubs.opengroup.org/onlinepubs/009695399/functions/mkdir.html
+					mkdir( state.ps.localpath, (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH ) );
+	#else
+					platform_conform_slashes( state.ps.localpath, MAX_PATH_SIZE );
+					created_directory = CreateDirectoryA( state.ps.localpath, 0 );
 
-				if ( !created_directory )
-				{
-					log_msg( "* CreateDirectory FAILED: [%s]\n", state.ps.localpath );
-				}
+					if ( !created_directory )
+					{
+						log_msg( "* CreateDirectory FAILED: [%s]\n", state.ps.localpath );
+					}
 
 
-#endif
+	#endif
 #endif
 
 				platform_makedirs( state.ps.localpath );
@@ -573,7 +781,7 @@ void process_downloads()
 #else
 			sprintf( state.msg, "Downloading %i of %i", state.ps.file_index, state.ps.file_count );
 #endif
-			sprintf( state.msg2, "Progress: (%iKB/%iKB)", state.downloadState.bytes_read/KB_DIV, state.downloadState.content_length/KB_DIV );
+			sprintf( state.msg2, "Progress: (%luKB/%luKB)", state.downloadState.bytes_read/KB_DIV, state.downloadState.content_length/KB_DIV );
 			set_msg_color( 255, 255, 255, 255 );
 		}
 	}
@@ -614,7 +822,7 @@ void process_downloads()
 			state.tdata.state = PRECACHE_STATE_DOWNLOAD_REQUEST;
 
 			THREAD_MSG( "* THREAD: Initiating download thread to fetch (%s)\n", state.ps.curfile->path );
-			thread_start( &state.t0, precache_download_thread, &state.tdata );
+			thread_start( &state.t0, precache_download_thread_curl, &state.tdata );
 		}
 	}
 	else if ( state.ps.state == PS_DOWNLOADING )
@@ -637,14 +845,14 @@ void process_downloads()
 #else
 		sprintf( state.msg, "Downloading %i of %i", state.ps.file_index, state.ps.file_count );
 #endif
-		sprintf( state.msg2, "Progress: (%iKB/%iKB)", state.downloadState.bytes_read/KB_DIV, state.downloadState.content_length/KB_DIV );
+		sprintf( state.msg2, "Progress: (%luKB/%luKB)", state.downloadState.bytes_read/KB_DIV, state.downloadState.content_length/KB_DIV );
 		set_msg_color( 255, 255, 255, 255 );
 
 		if ( state.downloadState.completed )
 		{
 			// switching states; reset colors, completed, etc.
 			state.downloadState.completed = 0;
-			log_msg( "\tDownloading \"%s\" -> success! (%i/%i)\n", state.ps.curfile->path, state.downloadState.bytes_read, state.downloadState.content_length );
+			log_msg( "\tDownloading \"%s\" -> success! (%lu/%lu)\n", state.ps.curfile->path, state.downloadState.bytes_read, state.downloadState.content_length );
 			state.ps.curfile->flags = PF_DOWNLOADED;
 			state.ps.state = PS_DOWNLOAD_NEXT;
 		}
@@ -764,15 +972,21 @@ void tick()
 
 
 
-
-
 int main()
 {
     xwl_window_t * window = 0;
 	xwl_windowparams_t p;
 	precache_file_t * file;
 	char log_path[ MAX_PATH_SIZE ];
-
+#if !PRECACHE_TEST
+	char temp_path[ MAX_PATH_SIZE ];
+#else
+	char * buffer;
+	long bufferSize;
+#endif
+	
+	// -----------------------------------------
+	// Main application colors and dimensions
 	float button_color[4] = PRECACHE_BUTTON_COLOR;
 	float button_hover_color[4] = PRECACHE_BUTTON_HOVER_COLOR;
 	float button_text_color[4] = PRECACHE_BUTTON_TEXT_COLOR;
@@ -789,18 +1003,9 @@ int main()
 	int progressBarPosition[2] = PRECACHE_PROGRESS_BAR_POSITION;
 	int progressBarSize[2] = PRECACHE_PROGRESS_BAR_SIZE;
 	int messageTextPositions[] = PRECACHE_MESSAGE_POSITIONS;
-#if !PRECACHE_TEST
-	char temp_path[ MAX_PATH_SIZE ];
-#else
-	char * buffer;
-	long bufferSize;
-#endif
 
-
-	timer_startup(&state.ts);
-
-	state.running = 1;
-
+	// -----------------------------------------
+	// user interface configuration
     /* setup button */
 	state.closeButton.event = cmd_quit;
 	state.closeButton.width = closeButtonSize[0];
@@ -834,13 +1039,21 @@ int main()
 
 #if PRECACHE_TEST
 	state.downloadPercent = 0.5;
-
 	state.bar.color[0] = state.bar_complete_color[0];
 	state.bar.color[1] = state.bar_complete_color[1];
 	state.bar.color[2] = state.bar_complete_color[2];
 	state.bar.color[3] = state.bar_complete_color[3];
 #endif
 
+	// -----------------------------------------
+	// initialize states
+#if USE_CURL
+	curl_global_init( 0 );
+#endif
+	
+	timer_startup(&state.ts);
+	state.running = 1;
+	
 	memset(&state.downloadState, 0, sizeof(http_download_state_t));
     state.tdata.download = &state.downloadState;
     state.tdata.precache = &state.ps;
@@ -856,31 +1069,23 @@ int main()
     state.ps.curfile->next = 0;
     memset( state.ps.curfile->checksum, 0, 33 );
     state.ps.curfile->flags = 0;
+	
+    // setup configure the paths
+    memset( state.ps.remotepath, 0, MAX_PATH_SIZE );
+	memset( state.ps.localpath, 0, MAX_PATH_SIZE );
+	platform_operating_directory( state.ps.localpath, MAX_PATH_SIZE );
+	
+	// -----------------------------------------
+	// add precache.list
     memset( state.ps.curfile->path, 0, MAX_PATH_SIZE );
     strcpy( state.ps.curfile->path, "/precache.list" );
 	strcpy( state.ps.curfile->targetpath, state.ps.curfile->path );
     state.ps.files = state.ps.curfile;
     state.ps.state = 0; // download precache.list mode.
 
-    // setup configure the paths
-    memset( state.ps.remotepath, 0, MAX_PATH_SIZE );
-	memset( state.ps.localpath, 0, MAX_PATH_SIZE );
-
     // the directory which contains the precache.list
 	strcpy( state.ps.remotepath, PRECACHE_URL );
 	precache_sanitize_path( state.ps.remotepath );
-
-	platform_operating_directory( state.ps.localpath, MAX_PATH_SIZE );
-
-	memset( log_path, 0, MAX_PATH_SIZE );
-	strcpy( log_path, state.ps.localpath );
-	strcat( log_path, "/" );
-	strcat( log_path, "precache.log" );
-
-	if ( !log_init_file( log_path ) )
-	{
-		printf( "Unable to open log file: %s\n", log_path );
-	}
 
 // Binaries for Apple bundles run three directories deeper from their perceived location.
 // So we are going to strip three directories from that path to get the perceived location...
@@ -909,37 +1114,50 @@ int main()
 
 	printf( "LocalPath: %s\n", state.ps.localpath );
 
+	// -----------------------------------------
+	// full log path
+	memset( log_path, 0, MAX_PATH_SIZE );
+	strcpy( log_path, state.ps.localpath );
+	strcat( log_path, "/" );
+	strcat( log_path, "precache.log" );
+	
+	if ( !log_init_file( log_path ) )
+	{
+		printf( "Unable to open log file: %s\n", log_path );
+	}	
+	
     strcpy( state.ps.precache_file, state.ps.localpath );
 	strcat( state.ps.precache_file, "/precache.list" );
 
+#if PRECACHE_TEST
     if ( state.ps.files )
     {
-        printf( "Dumping files on startup----------------------\n" );
+        printf( "[TEST] Dumping files on startup----------------------\n" );
         file = state.ps.files;
 
         while( file )
         {
-            printf( "File path: '%s', checksum: '%s'\n", file->path, file->checksum );
+            printf( "[TEST] File path: '%s', checksum: '%s'\n", file->path, file->checksum );
             file = file->next;
         }
-        printf( "----------------------\n" );
+        printf( "[TEST] ----------------------\n" );
     }
+#endif
 
+	// -----------------------------------------
+	// application and window setup
+    net_startup();
+    xwl_startup();	
+	mutex_create( &state.dl );
 	
     p.width = windowSize[0];
     p.height = windowSize[1];
     p.flags = XWL_OPENGL | XWL_WINDOWED | XWL_NORESIZE;
-
 #if _WIN32
 	p.flags |= XWL_WIN32_ICON;
 	p.hIcon = LoadIcon( GetModuleHandle(0), MAKEINTRESOURCE( IDI_PRECACHE_ICON ) );
 #endif
-
-    net_startup();
-    xwl_startup();
-
     window = xwl_create_window( &p, PRECACHE_WINDOW_TITLE, 0 );
-
     if ( !window )
     {
         fprintf( stderr, "Unable to create window!\n" );
@@ -950,6 +1168,7 @@ int main()
 	state.height = p.height;
     xwl_set_callback( callback );
 
+	// load background image
     background_load_embedded();
 
     // init font
@@ -960,30 +1179,39 @@ int main()
 	memset( state.msg2, 0, 256 );
 	set_msg_color( 255, 255, 255, 255 );
 
+	
+	
 #if PRECACHE_TEST
 	strcpy( state.msg, "PRECACHE_TEST is enabled..." );
 
 	strcpy( state.msg2, "Message 2 Text" );
 
 	strcpy( state.msg3, "Message 3 Text" );
-#if 0
-	if ( platform_is64bit() )
-	{
-		strcpy( state.msg2, "x86_64 OS detected." );
-	}
-	else
-	{
-		strcpy( state.msg2, "x86 OS detected." );
-	}
-#endif
+	
+	#if 0
+		if ( platform_is64bit() )
+		{
+			strcpy( state.msg2, "x86_64 OS detected." );
+		}
+		else
+		{
+			strcpy( state.msg2, "x86 OS detected." );
+		}
+	#endif
 
-#else
 	strcpy( state.msg, "Downloading precache.list..." );
-	mutex_create( &state.dl );
+	
 	THREAD_MSG( "* THREAD: Initiating download thread to fetch precache.list\n" );
 	state.ps.state = PS_DOWNLOAD_LIST;
     // start the download thread - this will attempt to grab the precache.list file
-    thread_start( &state.t0, precache_download_thread, &state.tdata );
+    thread_start( &state.t0, precache_download_thread_curl, &state.tdata );
+#else
+	strcpy( state.msg, "Downloading precache.list..." );
+	
+	THREAD_MSG( "* THREAD: Initiating download thread to fetch precache.list\n" );
+	state.ps.state = PS_DOWNLOAD_LIST;
+    // start the download thread - this will attempt to grab the precache.list file
+    thread_start( &state.t0, precache_download_thread_curl, &state.tdata );
 #endif
 
     memset( &state.event, 0, sizeof(xwl_event_t) );
@@ -1048,11 +1276,18 @@ int main()
 	// cleanup the precache list from the filesystem...
 	unlink( state.ps.precache_file );
 #endif
+	
+#if USE_CURL
+	curl_global_cleanup();
+#endif	
 
 	log_msg( "* Shutting down gracefully.\n" );
 
 	// destroy font stuff
 	font_destroy( &state.font );
+	
+	// free background texture
+	background_destroy();
 
     // shutdown xwl and network
 	xwl_shutdown();

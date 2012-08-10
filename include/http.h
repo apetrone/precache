@@ -41,8 +41,8 @@ extern "C" {
 // 2 -> read headers, to read: content
 typedef struct http_download_state_s
 {
-    int content_length;
-    int bytes_read;
+    size_t content_length;
+    size_t bytes_read;
     int status;
     int error;
     int completed;

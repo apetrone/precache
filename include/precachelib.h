@@ -56,7 +56,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PRECACHE_TEST 0
 
 #define XWL_DEBUG 0
-#define THREAD_DEBUG 0
+#define THREAD_DEBUG 1
 #define PARSE_DEBUG 0
 
 #if XWL_DEBUG
@@ -89,6 +89,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PRECACHE_LIST_FILELIST "filelist"
 #define PRECACHE_LIST_UPDATELIST "updaters"
 #define PRECACHE_LIST_CHMOD "mode"
+#define PRECACHE_LIST_FILESIZE "bytes"
 
 
 #if _WIN32
@@ -192,7 +193,11 @@ typedef struct precache_file_s
 	short extra_flags;
 	float timestamp;
 	int mode;
-
+	
+	// Content-Length header is not required - so it may not be sent by the server.
+	// This ensures the user knows how large the file they're downloading is.
+	size_t filesize;
+	
     struct precache_file_s * next;
 } precache_file_t;
 
@@ -254,6 +259,9 @@ int precache_should_update_self( precache_state_t * precache );
 #if LINUX || __APPLE__
 // convert a string of characters (chmod) to integer flags
 int precache_mode_string_to_integer( const char * mode );
+
+// convert integer flags back to a string of characters (chmod)
+void precache_mode_integer_to_string( int mode, char * permissions );
 #endif
 
 // convert RGBA float to RGBA unsigned char

@@ -54,6 +54,10 @@ def md5_from_file( file ):
 	f.close()
 	return m.hexdigest()
 	
+def size_from_file( file ):
+	statinfo = os.stat( file )
+	return statinfo.st_size
+
 def load_config( file ):
 	"""
 		Load precache configuration

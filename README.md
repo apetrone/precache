@@ -115,7 +115,7 @@ This is a simple config used to specify variables to precache. This assumes an a
 			{
 				"url": "http://localhost/project/",
 				"window_title": "Project"
-			}
+			},
 	
 			"excludes" :
 			[

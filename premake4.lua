@@ -10,6 +10,16 @@ project "precache"
 	kind "WindowedApp"
 	language ("C")
 	baseDefines = {}
+
+	dependency_libdirs =
+	{
+		"dependencies/curl/lib/"
+	}
+
+	dependency_links = 
+	{
+		"libcurl"
+	}
 	
 	files
 	{
@@ -20,6 +30,7 @@ project "precache"
 	includedirs
 	{ 
 		"include",
+		"dependencies/curl/include"
 	}
 
 	baseExcludes = 

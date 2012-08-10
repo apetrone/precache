@@ -54,10 +54,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define FONT_CALCULATE_ADVANCE( cinfo ) ((-cinfo->left + cinfo->advanceX)+1)
 
-void font_create( font_t * font )
-{
-}
-
 void font_load_embedded( font_t * font, const unsigned char * data, int dataSize )
 {
     int numChars;

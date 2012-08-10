@@ -11,7 +11,9 @@ import argparse
 import fnmatch
 import posixpath
 
-from utils import get_platform, get_platform_id, get_arch_id, get_mode_for_file, file_exists, load_config, ignores_to_regex, md5_from_file, create_flags, make_relative_to, default_file_mode
+from utils import get_platform, get_platform_id, get_arch_id, get_mode_for_file, \
+file_exists, load_config, ignores_to_regex, md5_from_file, create_flags, \
+make_relative_to, default_file_mode, size_from_file
 
 
 ignores = None
@@ -85,6 +87,7 @@ cfg['output_file'] = os.path.normpath( cfg['abs_target_path'] + '/' + PRECACHE_F
 def add_file_data( fullpath, relative_path, filedata ):
 	filedata['path'] = relative_path
 	filedata['md5'] = md5_from_file(fullpath)
+	filedata['bytes'] = int(size_from_file(fullpath))
 	return filedata
 
 def add_file( fullpath, relative_path, filedata ):

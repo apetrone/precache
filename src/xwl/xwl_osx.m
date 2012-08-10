@@ -286,27 +286,27 @@ u32 NonLocalizedKeys(unsigned short keycode)
 
 -(void)keyDown:(NSEvent*)event
 {
-	NSLog( @"xwlDelegate keyDown" );
+//	NSLog( @"xwlDelegate keyDown" );
 }
 
 -(void)keyUp:(NSEvent*)event
 {
-	NSLog( @"xwlDelegate keyUp" );
+//	NSLog( @"xwlDelegate keyUp" );
 }
 -(void) noResponderFor: (SEL)eventSelector
 {
-	NSLog( @"xwlDelegate: noResponderFor event!" );
+//	NSLog( @"xwlDelegate: noResponderFor event!" );
 	//[super noResponderFor:eventSelector];
 }
 
 -(void) windowWillMiniaturize:(NSNotification*)notification
 {
-	NSLog( @"Window will miniaturize" );
+//	NSLog( @"Window will miniaturize" );
 }
 
 -(void) windowDidMiniaturize:(NSNotification*)notification
 {
-	NSLog( @"Window did miniaturize!" );
+//	NSLog( @"Window did miniaturize!" );
 }
 
 -(BOOL) windowShouldClose:(id)windowIn
@@ -315,7 +315,7 @@ u32 NonLocalizedKeys(unsigned short keycode)
 	ev.type = XWLE_CLOSED;
 
 	xwl_send_event( &ev );
-	NSLog( @"Window should close?" );
+//	NSLog( @"Window should close?" );
 		
 	return YES;
 }
@@ -325,7 +325,7 @@ u32 NonLocalizedKeys(unsigned short keycode)
 	ev.type = XWLE_LOSTFOCUS;
 	xwl_send_event( &ev );
 	
-	NSLog( @"Window did resign key %@", [notification object] );
+//	NSLog( @"Window did resign key %@", [notification object] );
 }
 
 -(void) windowDidBecomeKey:(NSNotification*)notification
@@ -334,40 +334,40 @@ u32 NonLocalizedKeys(unsigned short keycode)
 	ev.type = XWLE_GAINFOCUS;
 	xwl_send_event( &ev );
 	
-	NSLog( @"Window did become key %@", [notification object] );
+//	NSLog( @"Window did become key %@", [notification object] );
 }
 
 -(void)windowDidBecomeMain:(NSNotification*)notification
 {
-	NSLog( @"windowDidBecomeMain %@", [notification object] );
+//	NSLog( @"windowDidBecomeMain %@", [notification object] );
 }
 
 -(void)windowDidResignMain:(NSNotification*)notification
 {
-	NSLog( @"windowDidResignMain %@", [notification object] );
+//	NSLog( @"windowDidResignMain %@", [notification object] );
 }
 
 -(void) windowWillClose
 {
-	NSLog( @"Window will close!" );
+//	NSLog( @"Window will close!" );
 }
 
 
 
 - (void)windowDidEndSheet:(NSNotification *)notification
 {
-	NSLog( @"Window did end sheet!" );
+//	NSLog( @"Window did end sheet!" );
 }
 
 - (void)windowDidDeminiaturize:(NSNotification *)notification
 {
-	NSLog( @"Window Did Deminiaturize!" );
+//	NSLog( @"Window Did Deminiaturize!" );
 }
 
 
 -(NSApplicationTerminateReply) applicationShouldTerminate:(NSApplication *)sender;
 {
-	NSLog( @"ApplicationShouldTerminate" );
+//	NSLog( @"ApplicationShouldTerminate" );
 	return YES;
 }
 
@@ -445,7 +445,7 @@ u32 NonLocalizedKeys(unsigned short keycode)
 
 -(void) applicationDidFinishLaunching:(NSNotification*)notification
 {
-	NSLog( @"Application finished launching?" );
+//	NSLog( @"Application finished launching?" );
 }
 @end
 #endif
@@ -555,12 +555,12 @@ void xwl_pollevent_osx( xwl_event_t * e )
 	
 	[ctx makeCurrentContext];
 	
-	NSLog( @"Lock Focus!" );
+//	NSLog( @"Lock Focus!" );
 }
 
 -(void)unlockFocus
 {
-	NSLog( @"unlock focus" );
+//	NSLog( @"unlock focus" );
 	[super unlockFocus];
 }
 
@@ -594,7 +594,7 @@ void xwl_pollevent_osx( xwl_event_t * e )
 
 -(void) noResponderFor: (SEL)eventSelector
 {
-	NSLog( @"MyOpenGLView: noResponderFor event!" );
+//	NSLog( @"MyOpenGLView: noResponderFor event!" );
 	[super noResponderFor:eventSelector];
 }
 
@@ -613,7 +613,7 @@ void xwl_pollevent_osx( xwl_event_t * e )
 	xwl_send_event( &ev );
 	
 	
-	NSLog( @"windowResized" );
+//	NSLog( @"windowResized" );
 }
 
 void dispatchMouseMoveEvent(NSEvent * theEvent)
@@ -1094,7 +1094,7 @@ void xwl_osx_finish( xwl_window_t * window )
 
 xwl_window_handle_t *xwl_create_osx_window( xwl_windowparams_t * params, const char * title )
 {
-	printf( "xwl_create_osx_window\n" );
+//	printf( "xwl_create_osx_window\n" );
 	xwl_window_handle_t * wh = 0;
 	XWLWINDOW * handle;
 	

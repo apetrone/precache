@@ -58,8 +58,6 @@ typedef struct font_s
 
 typedef unsigned char font_char_t;
 
-
-void font_create( font_t * font );
 void font_load_embedded( font_t * font, const unsigned char * data, int dataSize );
 void font_draw( font_t * font, int x, int y, const char * str, unsigned char r, unsigned char g, unsigned char b, unsigned char a );
 void font_destroy( font_t * font );
