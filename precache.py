@@ -65,8 +65,9 @@ if file_exists( config_path ):
 		output['install_path'] = '/' + output['install_path']
 
 	output['remote_project_path'] = cfg['remote_project_path']
-	if output['remote_project_path'][0] is not '/':
-		output['remote_project_path'] = '/' + output['remote_project_path']
+	if output['remote_project_path']:
+		if output['remote_project_path'][0] is not '.' and output['remote_project_path'][0] is not '/':
+			output['remote_project_path'] = '/' + output['remote_project_path']
 
 
 	if 'platforms' not in cfg:

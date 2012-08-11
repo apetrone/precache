@@ -71,8 +71,8 @@ void platform_conform_slashes( char * path, int path_len )
 // ------------------------------------------------------------------
 int platform_operating_directory( char * path, int size )
 {
-    int result;
-    char * sep;
+    int result = 0;
+    char * sep = 0;
 
 #if _WIN32
 	result = GetModuleFileNameA( GetModuleHandleA(0), path, size);

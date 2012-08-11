@@ -143,7 +143,7 @@ deploy contains a folder "bin", which contains three folders, one for each platf
 			{
 				"url": "http://localhost/project/",
 				"window_title": "Project"
-			}
+			},
 
 			"excludes" :
 			[

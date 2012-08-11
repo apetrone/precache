@@ -116,11 +116,14 @@ void font_load_embedded( font_t * font, const unsigned char * data, int dataSize
 
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
     glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-
     e = glGetError();
+    if ( e != GL_NO_ERROR )
+    {
+        printf( "Error glTexParameteri image: %i\n", e );
+    }	
+	
     glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, font->textureWidth, font->textureHeight, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, pixels );
     e = glGetError();
-
     if ( e != GL_NO_ERROR )
     {
         printf( "Error uploading image: %i\n", e );
@@ -141,7 +144,7 @@ void font_draw( font_t * font, int x, int y, const char * str, unsigned char r, 
     float xoffset;
     float yoffset;
     float zdepth = 0.1f;
-    font_charinfo_t * c, *prev;
+    font_charinfo_t * c;
 
 
 #if USEGL
@@ -159,11 +162,6 @@ void font_draw( font_t * font, int x, int y, const char * str, unsigned char r, 
 
         if ( !c )
             continue;
-
-        if ( loop > 0 )
-        {
-            prev = font_get_character( font, str[ loop-1 ] );
-        }
 
         charwidth = c->width;
         charheight = c->height;

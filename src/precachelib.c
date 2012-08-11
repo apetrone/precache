@@ -404,8 +404,11 @@ void precache_sanitize_path( char * path )
 {
 	size_t len = strlen(path);
 
+	// if path ends in a slash, remove it
 	if ( path[ len-1 ] == '/' || path[ len-1 ] == '\\' )
 		path[ len-1 ] = '\0';
+	
+	
 } // precache_sanitize_path
 
 

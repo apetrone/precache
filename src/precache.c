@@ -70,6 +70,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "platform.h"
 #include "precachelib.h"
 #include "precache.h"
+#include <math.h> // for fminf
 
 #if _WIN32
 	#include "resource.h"
@@ -90,7 +91,7 @@ typedef struct
 	http_download_state_t downloadState;
 
 	// rendering related
-	GLint background;
+	GLuint background;
 	button bar;
 	button closeButton;
 	short progressBarWidth;
@@ -355,15 +356,18 @@ THREAD_ENTRY precache_download_thread_curl( void * data )
 
     char remotepath[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
     char localpath[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
-	float dt;
+//	float dt;
 	int thread_id;
-	int last_bytes;
-	float last_read;
-	
+//	int last_bytes;
+//	float last_read;
+	char errorbuffer[ CURL_ERROR_SIZE ] = {0};
 	int http_status;
 	FILE * filehandle;
 #if LINUX || __APPLE__
 	int result;
+	char modestr[4] = {0};
+	
+	precache_mode_integer_to_string( td->file->mode, modestr );
 #endif
 	
     if ( !td || !download || !precache )
@@ -371,16 +375,18 @@ THREAD_ENTRY precache_download_thread_curl( void * data )
 	
 
 	
-	last_bytes = 0;
-	last_read = timer_ms(&state.ts);
+//	last_bytes = 0;
+//	last_read = timer_ms(&state.ts);
 	memset( download, 0, sizeof(http_download_state_t) );
 	
+	mutex_lock( &state.dl );
 	thread_id = g_thread_id;
-	THREAD_MSG( "-> T: Entering Thread (%i)...\n", g_thread_id );
 	g_thread_id++;	
-
+	mutex_unlock( &state.dl );
 	
-	while( td->state != PRECACHE_STATE_EXIT && td->state != PRECACHE_STATE_ERROR )
+	THREAD_MSG( "-> T: Entering Thread (%i)...\n", thread_id );
+	
+//	while( td->state != PRECACHE_STATE_EXIT && td->state != PRECACHE_STATE_ERROR )
 	{
 //	    mutex_lock( &state.dl );
 	
@@ -388,21 +394,21 @@ THREAD_ENTRY precache_download_thread_curl( void * data )
         {
 			if ( precache->curfile )
 			{
-				mutex_lock( &state.dl );
-				precache->curfile->timestamp = timer_ms(&state.ts);
+//				mutex_lock( &state.dl );
+				td->file->timestamp = timer_ms(&state.ts);
 				
 				// construct remote path
 				memset( remotepath, 0, PRECACHE_TEMP_BUFFER_SIZE );
 				strcpy( remotepath, precache->remotepath );
-				strcat( remotepath, precache->curfile->path );
+				strcat( remotepath, td->file->path );
 				
 				// construct local path
 				memset( localpath, 0, PRECACHE_TEMP_BUFFER_SIZE );
 				strcpy( localpath, precache->localpath );
-				strcat( localpath, precache->curfile->targetpath );
+				strcat( localpath, td->file->targetpath );
 				platform_conform_slashes( localpath, PRECACHE_TEMP_BUFFER_SIZE );
 				
-				download->content_length = precache->curfile->filesize;
+				download->content_length = td->file->filesize;
 				THREAD_MSG( "-> T: %i - Requesting a new file [remotepath=%s, localpath=%s, filesize=%lu]\n", thread_id, remotepath, localpath, download->content_length );
 				
 				
@@ -421,76 +427,58 @@ THREAD_ENTRY precache_download_thread_curl( void * data )
 				
 				log_msg( "* preparing a GET request with cURL...\n" );
 				curl = curl_easy_init();
-				curl_easy_setopt( curl, CURLOPT_VERBOSE, 0 );
+				curl_easy_setopt( curl, CURLOPT_CONNECTTIMEOUT, 5 );
+				curl_easy_setopt( curl, CURLOPT_VERBOSE, PRECACHE_CURL_VERBOSE );
 				curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, write_data );
 				curl_easy_setopt( curl, CURLOPT_WRITEDATA, &download_context );
 				curl_easy_setopt( curl, CURLOPT_URL, remotepath );
-				
-				mutex_unlock( &state.dl );
-				
+				curl_easy_setopt( curl, CURLOPT_ERRORBUFFER, errorbuffer );
+				curl_easy_setopt( curl, CURLOPT_FAILONERROR, 1 );
+				// perform the actual request
 				curl_result = curl_easy_perform( curl );
 				
-				mutex_lock( &state.dl );
-				download->completed = 1;
+				// close the file
 				fclose( filehandle );
-				
-				curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_status );
-				log_msg( "* http status code: %i\n", http_status );
 				
 				if ( curl_result == 0 )
 				{
+					download->completed = 1;
+					curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_status );
+					log_msg( "* http status code: %i\n", http_status );
+					
+					td->state = PRECACHE_STATE_EXIT;
 					log_msg( "* download completed.\n" );
-				}
-				else
-				{
-					log_msg( "* download failed\n" );
-					download->completed = 0;
-				}
-				
-				log_msg( "* cURL cleanup\n" );
-				curl_easy_cleanup( curl );
-				
-				td->state = PRECACHE_STATE_DOWNLOAD;
-				mutex_unlock( &state.dl );
-			}			
-		}
-		
-		if ( td->state != PRECACHE_STATE_EXIT )
-		{
-			if( download->error || download->completed )
-			{
-				mutex_lock( &state.dl );
-				if ( download->completed )
-				{
+					
 					THREAD_MSG( "-> T: %i - download complete!\n", thread_id );
 					
 					// set permissions on this file
 #if LINUX || __APPLE__
-					char modestr[4] = {0};
-					precache_mode_integer_to_string( precache->curfile->mode, modestr );
 					log_msg( "* Set permissions (%s) on file (%s)... \n", modestr, localpath );
-					result = chmod( localpath, precache->curfile->mode );
+					result = chmod( localpath, td->file->mode );
 					
 					if ( result != 0 )
 					{
 						log_msg( "* chmod failed with errno: %i\n", errno );
 					}
 #endif
-					
+						
 				}
 				else
 				{
+					download->error = 1;
+					log_msg( "* download failed: [%s]\n", errorbuffer );
+					download->completed = 0;
+					
 					THREAD_MSG( "-> T: %i - Unable to download file: %s\n", thread_id, remotepath );
-					strcpy( precache->err1, "Update failed! File not found:" );
-					strcpy( precache->err2, remotepath );
+					//					strcpy( precache->err1, "Update failed! File not found:" );
+					strcpy( precache->err1, errorbuffer );
+					strcpy( precache->err2, remotepath );			
 				}
 				
-				td->state = PRECACHE_STATE_EXIT;
-				mutex_unlock( &state.dl );
-			}
+				log_msg( "* cURL cleanup\n" );
+				curl_easy_cleanup( curl );
+			}	
 		}
-		
-//        mutex_unlock( &state.dl );
 	}
 	
 	THREAD_MSG( "-> T: %i - Leaving Thread.\n", thread_id );
@@ -498,137 +486,6 @@ THREAD_ENTRY precache_download_thread_curl( void * data )
 	return 0;
 }
 #endif
-
-THREAD_ENTRY precache_download_thread( void * data )
-{
-    precache_thread_data_t * td = (precache_thread_data_t*)data;
-    http_download_state_t * download = td->download;
-    precache_state_t * precache = td->precache;
-#if USE_CURL
-	CURL * curl;
-	CURLcode curl_result;
-#endif
-    char remotepath[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
-    char localpath[ PRECACHE_TEMP_BUFFER_SIZE ] = {0};
-	float dt;
-	int thread_id;
-	int last_bytes;
-	float last_read;
-	
-	int http_status;
-	FILE * filehandle;
-#if LINUX || __APPLE__
-	int result;
-#endif
-
-    if ( !td || !download || !precache )
-        return 0;
-
-	last_bytes = 0;
-	last_read = timer_ms(&state.ts);
-	memset( download, 0, sizeof(http_download_state_t) );
-
-	thread_id = g_thread_id;
-	THREAD_MSG( "-> T: Entering Thread (%i)...\n", g_thread_id );
-	g_thread_id++;
-
-	
-
-	
-	while( td->state != PRECACHE_STATE_EXIT && td->state != PRECACHE_STATE_ERROR )
-	{
-	    mutex_lock( &state.dl );
-		//log_msg( "* T: Think\n" );
-
-	    if ( td->state == PRECACHE_STATE_DOWNLOAD )
-	    {
-            http_download_tick( download, 1 );
-
-			if ( download->bytes_read != last_bytes )
-			{
-				last_bytes = download->bytes_read;
-				last_read = timer_ms(&state.ts);
-				//log_msg( "-> T: %i - total=%i bytes at last_read=%g\n", thread_id, last_bytes, last_read );
-			}
-			else
-			{
-				// if we haven't read any more bytes, see how long it's been since we last read bytes
-				dt = (timer_ms(&state.ts) - last_read);
-
-				if ( dt > PRECACHE_TIMEOUT_MS )
-				{
-					THREAD_MSG( "-> T: %i - Download of file \"%s\" timed out (%g)!\n", thread_id, remotepath, timer_ms(&state.ts) );
-					//td->precache->state = PS_DOWNLOAD_TIMEDOUT;
-					td->state = PRECACHE_STATE_EXIT;
-					td->download->error = 1;
-					strcpy( precache->err1, "Timed out while downloading:" );
-					strcpy( precache->err2, remotepath );
-				}
-			}
-	    }
-        else if ( td->state == PRECACHE_STATE_DOWNLOAD_REQUEST )
-        {
-			if ( precache->curfile )
-			{
-				precache->curfile->timestamp = timer_ms(&state.ts);
-
-				// construct remote path
-				memset( remotepath, 0, PRECACHE_TEMP_BUFFER_SIZE );
-				strcpy( remotepath, precache->remotepath );
-				strcat( remotepath, precache->curfile->path );
-
-				// construct local path
-				memset( localpath, 0, PRECACHE_TEMP_BUFFER_SIZE );
-				strcpy( localpath, precache->localpath );
-				strcat( localpath, precache->curfile->targetpath );
-				platform_conform_slashes( localpath, PRECACHE_TEMP_BUFFER_SIZE );
-
-				THREAD_MSG( "-> T: %i - Requesting a new file [remotepath=%s, localpath=%s]\n", thread_id, remotepath, localpath );
-
-				http_download_file( remotepath, localpath, PRECACHE_USER_AGENT, download );				
-
-				td->state = PRECACHE_STATE_DOWNLOAD;
-			}
-        }
-
-		if ( td->state != PRECACHE_STATE_EXIT )
-		{
-			if( download->error || download->completed )
-			{
-				if ( download->completed )
-				{
-					THREAD_MSG( "-> T: %i - download complete!\n", thread_id );
-
-					// set permissions on this file
-#if LINUX || __APPLE__
-					log_msg( "* Set permissions on file... (%i)\n", precache->curfile->mode );
-					result = chmod( localpath, precache->curfile->mode );
-
-					if ( result != 0 )
-					{
-						log_msg( "* chmod failed with errno: %i\n", errno );
-					}
-#endif
-
-				}
-				else
-				{
-					THREAD_MSG( "-> T: %i - Unable to download file: %s\n", thread_id, remotepath );
-					strcpy( precache->err1, "Update failed! File not found:" );
-					strcpy( precache->err2, remotepath );
-				}
-				td->state = PRECACHE_STATE_EXIT;
-			}
-		}
-
-        mutex_unlock( &state.dl );
-	}
-
-	THREAD_MSG( "-> T: %i - Leaving Thread.\n", thread_id );
-
-    return 0;
-}
-
 
 THREAD_ENTRY precache_calculate_checksums( void * data )
 {
@@ -761,6 +618,13 @@ void process_downloads()
 				set_msg_color( 255, 0, 0, 255 );
             }
 		}
+		else if ( state.ps.state == PS_DOWNLOAD_ERROR )
+		{
+			log_msg( "Error downloading precache.list - %s\n", state.ps.err1 );
+			set_msg_color( 255, 0, 0, 255 );
+			strcpy( state.msg, state.ps.err1 );
+			strcpy( state.msg2, state.ps.err2 );
+		}
 		else
 		{
 			if (state.downloadState.bytes_read > 0)
@@ -819,6 +683,7 @@ void process_downloads()
 			state.ps.file_index++;
 			// initiate download
 			thread_stop( &state.t0 );
+			state.tdata.file = state.ps.curfile;
 			state.tdata.state = PRECACHE_STATE_DOWNLOAD_REQUEST;
 
 			THREAD_MSG( "* THREAD: Initiating download thread to fetch (%s)\n", state.ps.curfile->path );
@@ -872,7 +737,8 @@ void process_downloads()
 			if ( state.ps.state == PS_DOWNLOAD_LIST )
 			{
 				// unable to download precache.list
-				strcpy( state.msg, "Error downloading precache.list from:" );
+				strcpy( state.msg, "Error: " );
+				strcpy( state.msg, state.ps.err1 );
 				strcpy( state.msg2, state.ps.remotepath );
 				strcat( state.msg2, "/precache.list" );
 				set_msg_color( 255, 0, 0, 255 );
@@ -901,7 +767,7 @@ void process_downloads()
 }
 
 
-void tick()
+void tick( void )
 {
 	xwl_pollevent( &state.event );
 
@@ -917,7 +783,8 @@ void tick()
 
 	render_background();
 
-	state.bar.width = (i16)(state.downloadPercent * state.progressBarWidth);
+
+	state.bar.width = (i16)(fmin(1.0, state.downloadPercent) * state.progressBarWidth);
 
 	// render close button
 	render_button( &state.closeButton );
@@ -938,8 +805,6 @@ void tick()
 		state.closeButton.color[1] = state.button_color[1];
 		state.closeButton.color[2] = state.button_color[2];
 	}
-
-
 
 
 	// draw black text to act as a drop-shadow; then draw full color text
@@ -1202,6 +1067,7 @@ int main()
 	strcpy( state.msg, "Downloading precache.list..." );
 	
 	THREAD_MSG( "* THREAD: Initiating download thread to fetch precache.list\n" );
+	state.tdata.file = state.ps.curfile;
 	state.ps.state = PS_DOWNLOAD_LIST;
     // start the download thread - this will attempt to grab the precache.list file
     thread_start( &state.t0, precache_download_thread_curl, &state.tdata );
@@ -1209,6 +1075,7 @@ int main()
 	strcpy( state.msg, "Downloading precache.list..." );
 	
 	THREAD_MSG( "* THREAD: Initiating download thread to fetch precache.list\n" );
+	state.tdata.file = state.ps.curfile;
 	state.ps.state = PS_DOWNLOAD_LIST;
     // start the download thread - this will attempt to grab the precache.list file
     thread_start( &state.t0, precache_download_thread_curl, &state.tdata );

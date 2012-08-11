@@ -74,7 +74,7 @@ int log_init_net()
 
 void log_msg( const char * format, ... )
 {
-	int buffer_size = 0;
+//	int buffer_size = 0;
 	va_list args;
 
 	if ( !logstate.initialized )
@@ -107,7 +107,7 @@ void log_msg( const char * format, ... )
 		vsprintf(logstate.buffer[logstate.buffer_id], format, args);
 		va_end(args);
 
-		buffer_size = strlen(logstate.buffer[logstate.buffer_id]);
+//		buffer_size = strlen(logstate.buffer[logstate.buffer_id]);
 	}
 
 } // log_msg

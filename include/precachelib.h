@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PRECACHE_STATE_DOWNLOAD_REQUEST 1 // request to download a file
 #define PRECACHE_STATE_DOWNLOAD 2 // downloading a file
 #define PRECACHE_STATE_EXIT 3
-#define PRECACHE_STATE_ERROR 4
+//#define PRECACHE_STATE_ERROR 4
 #define KB_DIV 1024
 #define MB_DIV 1048576
 
@@ -58,6 +58,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define XWL_DEBUG 0
 #define THREAD_DEBUG 1
 #define PARSE_DEBUG 0
+#define PRECACHE_CURL_VERBOSE 0
 
 #if XWL_DEBUG
 	#define xwlPrintf log_msg
@@ -235,6 +236,7 @@ typedef struct precache_thread_data_s
     int state;
     http_download_state_t * download;
     precache_state_t * precache;
+	precache_file_t * file;
 } precache_thread_data_t;
 
 typedef char md5_digest_t[ 33 ];
