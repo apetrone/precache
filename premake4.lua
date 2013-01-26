@@ -18,7 +18,7 @@ project "precache"
 
 	dependency_links = 
 	{
-		"libcurl"
+		"curl"
 	}
 	
 	files
@@ -38,6 +38,9 @@ project "precache"
 	}
 
 	excludes { baseExcludes }
+
+
+	links { dependency_links }
 
 	configuration {"windows"}
 		-- use static runtime on Windows
@@ -85,6 +88,8 @@ project "precache"
 		flags { "Symbols" }
 	
 	configuration { "macosx", "release" }
+
+		libdirs { "dependencies/curl/lib/Release" }
 		postbuildcommands
 		{
 			"cp ./resources/Info.plist build/bin/precache.app/Contents/",
@@ -97,12 +102,14 @@ project "precache"
 		targetname "precached"
 		targetsuffix ""
 
+
 	configuration { "macosx", "debug" }
-			postbuildcommands
-			{
-				"cp ./resources/Info.plist build/bin/precached.app/Contents/",
-				"mkdir -p build/bin/precached.app/Contents/Resources/",
-				"cp ./resources/precache.icns build/bin/precached.app/Contents/Resources/"
-			}
+		libdirs { "dependencies/curl/lib/Debug" }
+		postbuildcommands
+		{
+			"cp ./resources/Info.plist build/bin/precached.app/Contents/",
+			"mkdir -p build/bin/precached.app/Contents/Resources/",
+			"cp ./resources/precache.icns build/bin/precached.app/Contents/Resources/"
+		}
 
 	

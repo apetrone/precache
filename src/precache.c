@@ -25,14 +25,6 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-// use curl instead of home-grown http library
-#define USE_CURL 1
-
-#if USE_CURL
-	#include <curl/curl.h>
-#endif
-
 #include <stdio.h>
 
 #if _WIN32
@@ -44,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#pragma comment( lib, "opengl32.lib" )
 #elif __APPLE__
 	#include <errno.h>
+	#include <sys/socket.h>
 	#include <sys/stat.h> // for mkdir
 	#include <OpenGL/OpenGL.h>
 	#include <OpenGL/gl.h>
@@ -54,6 +47,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	#include <unistd.h>
 	#include <GL/gl.h>
 	#include <GL/glx.h>
+	#include <sys/socket.h>
+#endif
+
+// use curl instead of home-grown http library
+#define USE_CURL 1
+
+#if USE_CURL
+	#include <curl/curl.h>
 #endif
 
 
